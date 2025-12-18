@@ -93,7 +93,7 @@ npm install
 npm run dev
 
 # If you need to generate the database
-npx drizzle-kit push
+npx drizzle-kit migrate
 ```
 
 ---
