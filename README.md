@@ -92,6 +92,8 @@ npm install
 # Run local dev server
 npm run dev
 
+# If you need to generate the database
+npx drizzle-kit migrate
 ```
 
 ---
