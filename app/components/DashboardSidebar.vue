@@ -118,14 +118,27 @@
                         <Input v-model="userSearch" :placeholder="t('dashboard.searchUsers')" @input="searchUsers" />
                         <p v-if="shareError" class="text-sm text-red-500">{{ shareError }}</p>
 
+                        <div v-if="selectedUsers.length" class="flex flex-wrap gap-2">
+                            <button v-for="user in selectedUsers" :key="user.id"
+                                class="flex items-center gap-1 rounded-md border border-zinc-300 px-2 py-1 text-sm hover:bg-zinc-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+                                @click="removeSelectedUser(user.id)">
+                                <span>{{ user.email }}</span>
+                                <X class="h-3 w-3" />
+                            </button>
+                        </div>
+
                         <div class="flex flex-col gap-2">
                             <button v-for="user in userResults" :key="user.id"
                                 class="rounded-md border border-zinc-300 p-2 text-left text-sm hover:bg-zinc-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
-                                @click="shareWithUser(user)">
+                                @click="selectUser(user)">
                                 <span class="font-medium">{{ user.name }}</span>
                                 <span class="block opacity-70">{{ user.email }}</span>
                             </button>
                         </div>
+
+                        <Button class="cursor-pointer" :disabled="selectedUsers.length === 0" @click="shareWithSelectedUsers">
+                            {{ t('dashboard.shareSelectedUsers') }}
+                        </Button>
 
                         <p v-if="shareMessage" class="text-sm text-green-600">{{ shareMessage }}</p>
                     </div>
@@ -137,7 +150,7 @@
 
 <script lang="ts" setup>
 import { ref, watch } from 'vue';
-import { Folder, ChevronDown, MoreHorizontal } from "lucide-vue-next";
+import { Folder, ChevronDown, MoreHorizontal, X } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -152,6 +165,7 @@ const sharingFolder = ref<FolderItem | null>(null)
 const publicShareUrl = ref("")
 const userSearch = ref("")
 const userResults = ref<Array<{ id: number; name: string; email: string }>>([])
+const selectedUsers = ref<Array<{ id: number; name: string; email: string }>>([])
 const shareError = ref("")
 const shareMessage = ref("")
 
@@ -204,6 +218,7 @@ function openShareFolder(folder: FolderItem) {
     publicShareUrl.value = "";
     userSearch.value = "";
     userResults.value = [];
+    selectedUsers.value = [];
     shareError.value = "";
     shareMessage.value = "";
     showShareFolder.value = true;
@@ -259,20 +274,39 @@ async function searchUsers() {
     }
 }
 
-async function shareWithUser(user: { id: number; name: string; email: string }) {
+function selectUser(user: { id: number; name: string; email: string }) {
+    if (!selectedUsers.value.some((selectedUser) => selectedUser.id === user.id)) {
+        selectedUsers.value = [...selectedUsers.value, user];
+    }
+
+    userSearch.value = "";
+    userResults.value = [];
+}
+
+function removeSelectedUser(userId: number) {
+    selectedUsers.value = selectedUsers.value.filter((user) => user.id !== userId);
+}
+
+async function shareWithSelectedUsers() {
     if (!sharingFolder.value) {
         return;
     }
 
+    if (selectedUsers.value.length === 0) {
+        shareError.value = "Select at least one user";
+        return;
+    }
+
     try {
-        await $fetch(`/api/folders/share/user/${sharingFolder.value.id}`, {
+        const res = await $fetch<{ users: Array<{ id: number; name: string; email: string }> }>(`/api/folders/share/user/${sharingFolder.value.id}`, {
             method: "POST",
             body: {
-                userId: user.id
+                userIds: selectedUsers.value.map((user) => user.id)
             }
         });
 
-        shareMessage.value = `${t('dashboard.sharedWith')} ${user.email}`;
+        shareMessage.value = `${t('dashboard.sharedWith')} ${res.users.map((user) => user.email).join(", ")}`;
+        selectedUsers.value = [];
     } catch (err: any) {
         shareError.value = err?.data?.statusMessage || err?.statusMessage || "Could not share folder";
     }
