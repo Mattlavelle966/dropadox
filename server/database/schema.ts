@@ -12,9 +12,33 @@ export const users = sqliteTable("users", {
 export const uploads = sqliteTable("uploads", {
     id: int("id").primaryKey({ autoIncrement: true }),
     userId: text("user_id").references(() => users.id),
+    folderId: text("folder_id").references(() => folders.id),
     filePath: text("file_path"),
     privacyFlag: text("privacy_flag"),
     size: int("size").default(0),
+    createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
+})
+
+export const folders = sqliteTable("folders", {
+    id: int("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id").references(() => users.id),
+    name: text("name").notNull(),
+    createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
+})
+
+export const folderPublicShares = sqliteTable("folderPublicShares", {
+    id: int("id").primaryKey({ autoIncrement: true }),
+    folderId: text("folder_id").references(() => folders.id),
+    userId: text("user_id").references(() => users.id),
+    token: text("token").notNull(),
+    createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
+})
+
+export const folderUserShares = sqliteTable("folderUserShares", {
+    id: int("id").primaryKey({ autoIncrement: true }),
+    folderId: text("folder_id").references(() => folders.id),
+    ownerId: text("owner_id").references(() => users.id),
+    sharedWithUserId: text("shared_with_user_id").references(() => users.id),
     createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
 })
 

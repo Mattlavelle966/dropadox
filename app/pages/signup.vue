@@ -112,8 +112,8 @@ async function signUp() {
     });
 
     router.push("/login");
-  } catch (err) {
-    submissionError.value = t("signUp.error.submissionFailed");
+  } catch (err: any) {
+    submissionError.value = err?.data?.statusMessage || err?.statusMessage || err?.statusText || t("signUp.error.submissionFailed");
   }
 }
 

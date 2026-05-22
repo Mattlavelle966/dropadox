@@ -63,7 +63,7 @@ async function signIn() {
   if (!emailError.value && !passwordError.value) {
     // add api connection here
     try {
-      const res = await $fetch<{ token: string }>('api/login', {
+      const res = await $fetch<{ token: string }>('/api/login', {
         method: 'POST',
         body: {
           email: state.email,
@@ -74,15 +74,16 @@ async function signIn() {
       const token = useCookie('token', {
         maxAge: 172800,
         sameSite: 'strict',
-        secure: true
+        path: '/',
+        secure: false
       })
 
       token.value = res.token
 
-      await router.push('/dashboard')
+      await navigateTo('/dashboard')
 
     } catch (err: any) {
-      submissionError.value = err.statusText;
+      submissionError.value = err?.data?.statusMessage || err?.statusMessage || err?.statusText || 'Login failed.';
     }
 
   }

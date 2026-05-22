@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { users } from '../database/schema';
 import { User } from '../utils/useDrizzle';
 import bcrypt from 'bcryptjs';
@@ -28,6 +28,7 @@ export default defineEventHandler(async (event) => {
             .select()
             .from(users)
             .where(eq(users.name, username))
+            .orderBy(desc(users.id))
             .get();
     }
 
@@ -36,6 +37,7 @@ export default defineEventHandler(async (event) => {
             .select()
             .from(users)
             .where(eq(users.email, email))
+            .orderBy(desc(users.id))
             .get();
     }
 
@@ -59,6 +61,13 @@ export default defineEventHandler(async (event) => {
         emailAddress: user.email,
         id: user.id
     }, process.env.JSON_SECRET_KEY!, { expiresIn: "48h" })
+
+    setCookie(event, "token", token, {
+        maxAge: 172800,
+        sameSite: "strict",
+        path: "/",
+        secure: false
+    });
 
     return { token }
 });
