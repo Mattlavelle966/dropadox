@@ -1,5 +1,5 @@
-import { and, eq } from "drizzle-orm";
-import { folderUserShares, uploads } from "~~/server/database/schema";
+import { eq } from "drizzle-orm";
+import { uploads } from "~~/server/database/schema";
 import { getStoredFileName } from "~~/server/utils/fileStorage";
 
 export default defineEventHandler(async (event) => {
@@ -18,16 +18,11 @@ export default defineEventHandler(async (event) => {
     }
 
     const isOwner = upload.userId === String(userPayload.id);
-    const sharedFolder = upload.folderId
-        ? await useDrizzle().select().from(folderUserShares)
-            .where(and(
-                eq(folderUserShares.folderId, upload.folderId),
-                eq(folderUserShares.sharedWithUserId, String(userPayload.id))
-            ))
-            .get()
+    const folderAccess = upload.folderId
+        ? await getFolderAccess(useDrizzle(), upload.folderId, String(userPayload.id))
         : null;
 
-    if (!isOwner && !sharedFolder) {
+    if (!isOwner && !folderAccess?.isOwner && !folderAccess?.isSharedWithUser) {
         throw createError({
             statusCode: 403,
             statusMessage: "Not allowed"

@@ -1,7 +1,7 @@
 import { defineEventHandler, sendStream, createError } from "h3";
 import fs from "fs";
-import { and, eq } from "drizzle-orm";
-import { folderUserShares, uploads } from "../../database/schema";
+import { eq } from "drizzle-orm";
+import { uploads } from "../../database/schema";
 import { setDownloadHeaders } from "../../utils/fileStorage";
 
 export default defineEventHandler(async (event) => {
@@ -32,16 +32,11 @@ export default defineEventHandler(async (event) => {
   }
 
   const isOwner = record.userId === userId;
-  const isSharedWithUser = record.folderId
-    ? await db.select().from(folderUserShares)
-      .where(and(
-        eq(folderUserShares.folderId, record.folderId),
-        eq(folderUserShares.sharedWithUserId, userId)
-      ))
-      .get()
+  const folderAccess = record.folderId
+    ? await getFolderAccess(db, record.folderId, userId)
     : null;
 
-  if (!isOwner && !isSharedWithUser) {
+  if (!isOwner && !folderAccess?.isOwner && !folderAccess?.isSharedWithUser) {
     throw createError({
       statusCode: 403,
       statusMessage: "Not allowed"

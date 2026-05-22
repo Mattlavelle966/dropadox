@@ -1,8 +1,7 @@
 import Busboy from "busboy";
 import fs from "fs";
 import path from "path";
-import { and, eq } from "drizzle-orm";
-import { folders, uploads } from "../database/schema";
+import { uploads } from "../database/schema";
 import { getUserStorageBytes } from "../database/userStorage";
 import { getUploadDir, safeFileName } from "../utils/fileStorage";
 
@@ -145,17 +144,14 @@ export default defineEventHandler(async (event) => {
             });
         }
 
+        const db = useDrizzle();
+        const userId = String(userPayload.id);
         const folderId = parsed.folderId ? String(parsed.folderId) : null;
 
         if (folderId) {
-            const folder = await useDrizzle().select().from(folders)
-                .where(and(
-                    eq(folders.id, Number(folderId)),
-                    eq(folders.userId, String(userPayload.id))
-                ))
-                .get();
+            const folderAccess = await getFolderAccess(db, folderId, userId);
 
-            if (!folder) {
+            if (!folderAccess || (!folderAccess.isOwner && !folderAccess.isSharedWithUser)) {
                 throw createError({
                     statusCode: 404,
                     statusMessage: "Folder not found"
@@ -186,9 +182,9 @@ export default defineEventHandler(async (event) => {
             });
         }
 
-        const upload = await useDrizzle().insert(uploads)
+        const upload = await db.insert(uploads)
             .values({
-                userId: String(userPayload.id),
+                userId,
                 folderId,
                 filePath: parsed.uploadPath,
                 privacyFlag: "private",

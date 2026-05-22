@@ -1,4 +1,4 @@
-import { folderUserShares, uploads } from '~~/server/database/schema';
+import { uploads } from '~~/server/database/schema';
 import { and, eq, isNull } from 'drizzle-orm';
 import { getUserFromPayload } from '~~/server/utils/getUser';
 import { getStoredFileName } from '~~/server/utils/fileStorage';
@@ -21,16 +21,16 @@ export default defineEventHandler(async (event) => {
     let uploadFilter = and(eq(uploads.userId, user.id.toString()), isNull(uploads.folderId));
 
     if (folderId) {
-        const sharedFolder = await useDrizzle().select().from(folderUserShares)
-            .where(and(
-                eq(folderUserShares.folderId, String(folderId)),
-                eq(folderUserShares.sharedWithUserId, user.id.toString())
-            ))
-            .get();
+        const folderAccess = await getFolderAccess(useDrizzle(), String(folderId), user.id.toString());
 
-        uploadFilter = sharedFolder
-            ? eq(uploads.folderId, String(folderId))
-            : and(eq(uploads.userId, user.id.toString()), eq(uploads.folderId, String(folderId)));
+        if (!folderAccess || (!folderAccess.isOwner && !folderAccess.isSharedWithUser)) {
+            throw createError({
+                statusCode: 404,
+                statusMessage: "Folder not found"
+            });
+        }
+
+        uploadFilter = eq(uploads.folderId, String(folderId));
     }
 
     const userUploads = await useDrizzle().select().from(uploads)

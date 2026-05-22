@@ -1,5 +1,5 @@
 import fs from "fs";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { uploads } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
@@ -13,13 +13,11 @@ export default defineEventHandler(async (event) => {
     }
 
     const userPayload = getAuthenticatedUserPayload(event);
+    const userId = String(userPayload.id);
     const db = useDrizzle();
 
     const upload = await db.select().from(uploads)
-        .where(and(
-            eq(uploads.id, fileId),
-            eq(uploads.userId, String(userPayload.id))
-        ))
+        .where(eq(uploads.id, fileId))
         .get();
 
     if (!upload) {
@@ -29,11 +27,20 @@ export default defineEventHandler(async (event) => {
         });
     }
 
+    const folderAccess = upload.folderId
+        ? await getFolderAccess(db, upload.folderId, userId)
+        : null;
+    const canDelete = upload.userId === userId || folderAccess?.isOwner;
+
+    if (!canDelete) {
+        throw createError({
+            statusCode: 403,
+            statusMessage: "Not allowed"
+        });
+    }
+
     await db.delete(uploads)
-        .where(and(
-            eq(uploads.id, fileId),
-            eq(uploads.userId, String(userPayload.id))
-        ));
+        .where(eq(uploads.id, fileId));
 
     if (upload.filePath && fs.existsSync(upload.filePath)) {
         fs.unlinkSync(upload.filePath);

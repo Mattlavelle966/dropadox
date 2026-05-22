@@ -31,10 +31,7 @@ export default defineEventHandler(async (event) => {
     }
 
     const folderUploads = await db.select().from(uploads)
-        .where(and(
-            eq(uploads.folderId, String(folderId)),
-            eq(uploads.userId, userId)
-        ))
+        .where(eq(uploads.folderId, String(folderId)))
         .all();
 
     for (const upload of folderUploads) {
@@ -44,10 +41,7 @@ export default defineEventHandler(async (event) => {
     }
 
     await db.delete(uploads)
-        .where(and(
-            eq(uploads.folderId, String(folderId)),
-            eq(uploads.userId, userId)
-        ));
+        .where(eq(uploads.folderId, String(folderId)));
 
     await db.delete(folderPublicShares)
         .where(and(

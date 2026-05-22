@@ -45,7 +45,6 @@ const response = ref(null);
 const error = ref(null);
 const uploading = ref(false);
 const uploadProgress = ref(0);
-const router = useRouter();
 
 function onFileChange(e) {
   file.value = e.target.files[0];
@@ -112,7 +111,6 @@ async function upload() {
     response.value = data;
     error.value = null;
     emit("uploaded");
-    await router.push("/dashboard")
   } catch (err) {
     const data = err?.data;
 
