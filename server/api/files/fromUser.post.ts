@@ -1,21 +1,14 @@
-import jwt from 'jsonwebtoken';
 import { folderUserShares, uploads } from '~~/server/database/schema';
 import { and, eq, isNull } from 'drizzle-orm';
-import { getUserFromPayload, getUserPayload } from '~~/server/utils/getUser';
+import { getUserFromPayload } from '~~/server/utils/getUser';
+import { getStoredFileName } from '~~/server/utils/fileStorage';
 
 export default defineEventHandler(async (event) => {
     const body = await readBody(event);
 
-    const { token, folderId } = body;
+    const { folderId } = body;
 
-    if (!token) {
-        throw createError({
-            statusText: "No token provided",
-            status: 400,
-        })
-    }
-
-    const userPayload = getUserPayload(token);
+    const userPayload = getAuthenticatedUserPayload(event);
     const user = await getUserFromPayload(userPayload);
 
     if (!user) {
@@ -44,5 +37,15 @@ export default defineEventHandler(async (event) => {
         .where(uploadFilter)
         .all()
 
-    return { userUploads }
+    return {
+        userUploads: userUploads.map(upload => ({
+            id: upload.id,
+            userId: upload.userId,
+            folderId: upload.folderId,
+            privacyFlag: upload.privacyFlag,
+            size: upload.size,
+            createdAt: upload.createdAt,
+            fileName: upload.filePath ? getStoredFileName(upload.filePath) : null
+        }))
+    }
 });

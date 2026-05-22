@@ -3,18 +3,14 @@ import { users } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
     const query = getQuery(event);
-    const token = String(query.token ?? "");
     const search = String(query.q ?? "").trim();
-
-    if (!token) {
-        throw createError({ statusCode: 400, statusMessage: "No token provided" });
-    }
 
     if (search.length < 2) {
         return { users: [] };
     }
 
-    const userPayload = getUserPayload(token);
+    enforceRateLimit(event, "user-search", 120, 60_000);
+    const userPayload = getAuthenticatedUserPayload(event);
     const results = await useDrizzle().select({
         id: users.id,
         name: users.name,

@@ -2,19 +2,11 @@ import { defineEventHandler, sendStream, createError } from "h3";
 import fs from "fs";
 import { and, eq } from "drizzle-orm";
 import { folderUserShares, uploads } from "../../database/schema";
+import { setDownloadHeaders } from "../../utils/fileStorage";
 
 export default defineEventHandler(async (event) => {
   const { id } = event.context.params as { id: string };
-  const token = getCookie(event, "token");
-
-  if (!token) {
-    throw createError({
-      statusCode: 401,
-      statusMessage: "Not authenticated"
-    });
-  }
-
-  const userPayload = getUserPayload(token);
+  const userPayload = getAuthenticatedUserPayload(event);
   const userId = String(userPayload.id);
 
   const db = useDrizzle();
@@ -66,6 +58,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // 3) Stream file
+  setDownloadHeaders(event, record.filePath);
   const stream = fs.createReadStream(record.filePath);
   return sendStream(event, stream);
 });

@@ -10,7 +10,7 @@
         <div v-for="upload in uploads" :key="upload.id"
           class="flex items-center justify-between rounded-md bg-white p-4 shadow-sm dark:bg-neutral-800 dark:text-white">
           <div class="min-w-0">
-            <p class="truncate font-medium">{{ getFileName(upload.filePath ?? '') }}</p>
+            <p class="truncate font-medium">{{ upload.fileName }}</p>
             <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ upload.size ?? 0 }} bytes</p>
           </div>
 
@@ -28,20 +28,19 @@
 
 <script setup lang="ts">
 import { Download } from "lucide-vue-next";
-import { getFileName } from "~~/shared/utils/getFileName";
 
 const route = useRoute();
 const token = String(route.params.token);
 
 const data = await $fetch<{
   folder: { id: number; name: string };
-  uploads: Array<{ id: number; filePath?: string; size?: number }>;
+  uploads: Array<{ id: number; fileName?: string; size?: number }>;
 }>(`/api/public/folders/${token}`);
 
 const folder = data.folder;
 const uploads = data.uploads;
 
-async function download(upload: { id: number; filePath?: string }) {
+async function download(upload: { id: number; fileName?: string }) {
   const res = await fetch(`/api/public/download/${token}/${upload.id}`);
 
   if (!res.ok) {
@@ -52,7 +51,7 @@ async function download(upload: { id: number; filePath?: string }) {
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = getFileName(upload.filePath ?? "") || "download";
+  a.download = upload.fileName || "download";
   a.style.display = "none";
   document.body.appendChild(a);
   a.click();

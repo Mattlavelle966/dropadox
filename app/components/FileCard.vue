@@ -87,13 +87,11 @@ async function deleteFile(event: MouseEvent) {
     deleting.value = true;
 
     try {
-        const token = useCookie("token").value;
         const res = await fetch(`/api/files/delete/${props.fileId}`, {
             method: "POST",
             headers: {
                 "content-type": "application/json"
-            },
-            body: JSON.stringify({ token })
+            }
         });
 
         if (!res.ok) {

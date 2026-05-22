@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { folderPublicShares, folders, uploads } from "~~/server/database/schema";
+import { getStoredFileName } from "~~/server/utils/fileStorage";
 
 export default defineEventHandler(async (event) => {
     const shareToken = getRouterParam(event, "token");
@@ -17,6 +18,10 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 404, statusMessage: "Share not found" });
     }
 
+    if (share.expiresAt && new Date(share.expiresAt).getTime() <= Date.now()) {
+        throw createError({ statusCode: 410, statusMessage: "Share link expired" });
+    }
+
     const folder = await db.select().from(folders)
         .where(eq(folders.id, Number(share.folderId)))
         .get();
@@ -29,5 +34,14 @@ export default defineEventHandler(async (event) => {
         .where(eq(uploads.folderId, share.folderId))
         .all();
 
-    return { folder, uploads: folderUploads };
+    return {
+        folder,
+        uploads: folderUploads.map(upload => ({
+            id: upload.id,
+            folderId: upload.folderId,
+            size: upload.size,
+            createdAt: upload.createdAt,
+            fileName: upload.filePath ? getStoredFileName(upload.filePath) : null
+        }))
+    };
 });

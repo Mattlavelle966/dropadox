@@ -44,13 +44,9 @@
 <script setup lang="ts">
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-const cookie = useCookie('token') ?? false
 const router = useRouter()
 const { t } = useI18n()
 const updateError = ref("")
-if (!cookie.value) {
-  router.push('/login')
-}
 
 const color = ref('light')
 
@@ -60,7 +56,6 @@ async function updateSettings() {
     await $fetch('/api/userSettings', {
       method: 'POST',
       body: {
-        token: cookie.value,
         color_mode: color.value
       }
     })

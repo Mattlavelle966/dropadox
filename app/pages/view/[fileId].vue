@@ -7,7 +7,7 @@
                     <h1 class="text-2xl font-bold mb-4">{{t("view.fileDetails.title")}}</h1>
                     <p>{{t("view.fileDetails.fileId")}}: {{ upload.id }}</p>
                     <p>{{t("view.fileDetails.fileSize")}}: {{ upload.size }} bytes</p>
-                    <p>{{t("view.fileDetails.fileName")}}: {{ getFileName(upload.filePath) }}</p>
+                    <p>{{t("view.fileDetails.fileName")}}: {{ upload.fileName }}</p>
                     <p>{{t("view.fileDetails.uploadedAt")}}: {{ new Date(upload.createdAt).toLocaleString() }}</p>
                     <Button @click="download" class="bg-blue-500 hover:bg-blue-400 cursor-pointer hover:scale-[101%]">
                         <Download />
@@ -21,21 +21,22 @@
 
 <script setup lang="ts">
 import { Download } from 'lucide-vue-next';
-import { getFileName } from '~~/shared/utils/getFileName';
 const {t} = useI18n();
 const { fileId } = useRoute().params;
-const token = useCookie("token").value;
 
-if (!token) {
-    await navigateTo("/login");
+let fileUpload;
+
+try {
+    fileUpload = await $fetch.raw(`/api/files/get/${fileId}`, {
+        method: "post"
+    });
+} catch (err: any) {
+    if (err?.statusCode === 401 || err?.status === 401) {
+        await navigateTo("/login");
+    } else {
+        await navigateTo("/dashboard");
+    }
 }
-
-const fileUpload = await $fetch.raw(`/api/files/get/${fileId}`, {
-    method: "post",
-    body: {
-        token: token
-    },
-});
 
 if(!fileUpload){
     await navigateTo("/dashboard");
@@ -46,8 +47,7 @@ const upload = (fileUpload._data as any).upload;
 const selectedFolderId = ref<string | null>(upload.folderId ? String(upload.folderId) : null);
 
 const folderData = await $fetch<{ folders: Array<{ id: number; name: string }> }>("/api/folders/list", {
-    method: "POST",
-    body: { token }
+    method: "POST"
 });
 
 const folders = ref(folderData.folders ?? []);
@@ -88,7 +88,7 @@ async function download() {
 
         const a = document.createElement("a");
         a.href = url;
-        a.download = upload.filePath || "download";
+        a.download = upload.fileName || "download";
         a.style.display = "none";
         document.body.appendChild(a);
         a.click();
@@ -101,7 +101,7 @@ async function download() {
 }
 
 useHead({
-  title: t("common.siteName") + " - " + getFileName(upload.filePath)
+  title: t("common.siteName") + " - " + upload.fileName
 })
 
 </script>

@@ -101,10 +101,7 @@ async function upload() {
     uploading.value = true;
     uploadProgress.value = 0;
 
-    const token = useCookie("token").value;
-
     const form = new FormData();
-    form.append("token", token);
     if (props.folderId) {
       form.append("folderId", props.folderId);
     }

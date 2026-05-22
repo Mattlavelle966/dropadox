@@ -2,16 +2,7 @@ import { eq } from "drizzle-orm";
 import { folderUserShares, folders } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
-    const { token } = await readBody(event);
-
-    if (!token) {
-        throw createError({
-            statusCode: 400,
-            statusMessage: "No token provided"
-        });
-    }
-
-    const userPayload = getUserPayload(token);
+    const userPayload = getAuthenticatedUserPayload(event);
 
     const db = useDrizzle();
     const userFolders = await db.select().from(folders)

@@ -4,7 +4,6 @@ import { folderPublicShares, folderUserShares, folders, uploads } from "~~/serve
 
 export default defineEventHandler(async (event) => {
     const folderId = Number(getRouterParam(event, "folderId"));
-    const { token } = await readBody(event);
 
     if (!Number.isInteger(folderId)) {
         throw createError({
@@ -13,14 +12,7 @@ export default defineEventHandler(async (event) => {
         });
     }
 
-    if (!token) {
-        throw createError({
-            statusCode: 400,
-            statusMessage: "No token provided"
-        });
-    }
-
-    const userPayload = getUserPayload(token);
+    const userPayload = getAuthenticatedUserPayload(event);
     const userId = String(userPayload.id);
     const db = useDrizzle();
 

@@ -2,14 +2,8 @@ import { and, eq } from "drizzle-orm";
 import { folders } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
-    const { token, name } = await readBody(event);
-
-    if (!token) {
-        throw createError({
-            statusCode: 400,
-            statusMessage: "No token provided"
-        });
-    }
+    enforceRateLimit(event, "folder-create", 30, 60_000);
+    const { name } = await readBody(event);
 
     const folderName = String(name ?? "").trim();
 
@@ -20,7 +14,7 @@ export default defineEventHandler(async (event) => {
         });
     }
 
-    const userPayload = getUserPayload(token);
+    const userPayload = getAuthenticatedUserPayload(event);
 
     const existingFolder = await useDrizzle().select().from(folders)
         .where(and(

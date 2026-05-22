@@ -3,23 +3,17 @@ import fs from "fs";
 import path from "path";
 import { and, eq } from "drizzle-orm";
 import { folders, uploads } from "../database/schema";
-import jwt from "jsonwebtoken";
-import { UserPayload } from "~/shared/types/UserPayload";
 import { getUserStorageBytes } from "../database/userStorage";
+import { getUploadDir, safeFileName } from "../utils/fileStorage";
 
 const DEFAULT_MAX_BYTES = 10_000_000_000;
 
 type ParsedUpload = {
-    token?: string;
     filename?: string;
     mimeType?: string;
     uploadPath?: string;
     folderId?: string;
     size: number;
-}
-
-function safeFileName(filename: string) {
-    return path.basename(filename).replace(/[^\w.\- ]+/g, "_");
 }
 
 function removeFileIfExists(filePath?: string) {
@@ -35,26 +29,22 @@ function getMaxBytes() {
         : DEFAULT_MAX_BYTES;
 }
 
-async function parseUpload(event: any): Promise<ParsedUpload> {
-    const uploadDir = path.join(process.cwd(), "public/uploads");
-    fs.mkdirSync(uploadDir, { recursive: true });
-
+async function parseUpload(event: any, maxBytes: number, limitStatus = "FILE_TOO_LARGE"): Promise<ParsedUpload> {
+    const uploadDir = getUploadDir();
     return new Promise((resolve, reject) => {
         const parsed: ParsedUpload = { size: 0 };
         const pendingWrites: Promise<void>[] = [];
+        let rejected = false;
 
         const busboy = Busboy({
             headers: event.node.req.headers,
             limits: {
-                files: 1
+                files: 1,
+                fileSize: maxBytes
             }
         });
 
         busboy.on("field", (name, value) => {
-            if (name === "token") {
-                parsed.token = value;
-            }
-
             if (name === "folderId") {
                 parsed.folderId = value;
             }
@@ -78,6 +68,19 @@ async function parseUpload(event: any): Promise<ParsedUpload> {
                 parsed.size += chunk.length;
             });
 
+            file.on("limit", () => {
+                rejected = true;
+                removeFileIfExists(parsed.uploadPath);
+                reject(createError({
+                    statusCode: 413,
+                    statusMessage: limitStatus,
+                    data: {
+                        maxBytes,
+                        fileBytes: parsed.size
+                    }
+                }));
+            });
+
             file.pipe(writeStream);
             pendingWrites.push(new Promise((writeResolve, writeReject) => {
                 writeStream.on("finish", writeResolve);
@@ -91,6 +94,10 @@ async function parseUpload(event: any): Promise<ParsedUpload> {
         });
 
         busboy.on("close", async () => {
+            if (rejected) {
+                return;
+            }
+
             try {
                 await Promise.all(pendingWrites);
                 resolve(parsed);
@@ -107,14 +114,29 @@ export default defineEventHandler(async (event) => {
     let parsed: ParsedUpload | undefined;
 
     try {
-        parsed = await parseUpload(event);
+        enforceRateLimit(event, "upload", 20, 60_000);
+        const userPayload = getAuthenticatedUserPayload(event);
+        const maxBytes = getMaxBytes();
+        const usedBytes = await getUserStorageBytes(String(userPayload.id));
+        const remainingBytes = maxBytes - usedBytes;
 
-        if (!parsed.token) {
+        if (remainingBytes <= 0) {
             throw createError({
-                statusCode: 400,
-                statusMessage: "No token found"
+                statusCode: 413,
+                statusMessage: "MAXIMUM_STORAGE_REACHED",
+                data: {
+                    maxBytes,
+                    usedBytes,
+                    fileBytes: 0
+                }
             });
         }
+
+        parsed = await parseUpload(
+            event,
+            Math.min(maxBytes, remainingBytes),
+            remainingBytes < maxBytes ? "MAXIMUM_STORAGE_REACHED" : "FILE_TOO_LARGE"
+        );
 
         if (!parsed.uploadPath || !parsed.filename) {
             throw createError({
@@ -123,9 +145,6 @@ export default defineEventHandler(async (event) => {
             });
         }
 
-        const userPayload = jwt.verify(parsed.token, process.env.JSON_SECRET_KEY!) as UserPayload;
-        const usedBytes = await getUserStorageBytes(String(userPayload.id));
-        const maxBytes = getMaxBytes();
         const folderId = parsed.folderId ? String(parsed.folderId) : null;
 
         if (folderId) {
@@ -177,7 +196,15 @@ export default defineEventHandler(async (event) => {
             }).returning().get();
 
         return {
-            upload,
+            upload: {
+                id: upload.id,
+                userId: upload.userId,
+                folderId: upload.folderId,
+                privacyFlag: upload.privacyFlag,
+                size: upload.size,
+                createdAt: upload.createdAt,
+                fileName: parsed.filename
+            },
             name: parsed.filename,
             type: parsed.mimeType,
             size: parsed.size

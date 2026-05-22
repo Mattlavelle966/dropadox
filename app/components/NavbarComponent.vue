@@ -41,12 +41,18 @@
 
 <script lang="ts" setup>
 const { t } = useI18n();
-const isLoggedIn = useCookie('token') ?? false
+const { data: session } = await useFetch("/api/verifyToken", {
+    method: "POST"
+});
+const isLoggedIn = computed(() => Boolean(session.value));
 const router = useRouter()
 async function logoff() {
-    if (isLoggedIn) {
-        isLoggedIn.value = null;
-        router.push('/')
+    if (isLoggedIn.value) {
+        await $fetch("/api/logout", {
+            method: "POST"
+        });
+        session.value = null;
+        await router.push('/')
     }
 }
 </script>

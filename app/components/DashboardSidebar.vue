@@ -183,11 +183,9 @@ async function createFolder() {
     folderError.value = "";
 
     try {
-        const token = useCookie("token").value;
         const res = await $fetch<{ folder: { id: number; name: string } }>("/api/folders/create", {
             method: "POST",
             body: {
-                token,
                 name: folderName.value
             }
         });
@@ -220,10 +218,8 @@ async function createPublicShare() {
     shareMessage.value = "";
 
     try {
-        const token = useCookie("token").value;
         const res = await $fetch<{ url: string }>(`/api/folders/share/public/${sharingFolder.value.id}`, {
-            method: "POST",
-            body: { token }
+            method: "POST"
         });
 
         publicShareUrl.value = `${window.location.origin}${res.url}`;
@@ -251,10 +247,8 @@ async function searchUsers() {
     }
 
     try {
-        const token = useCookie("token").value;
         const res = await $fetch<{ users: Array<{ id: number; name: string; email: string }> }>("/api/users/search", {
             query: {
-                token,
                 q: userSearch.value
             }
         });
@@ -271,11 +265,9 @@ async function shareWithUser(user: { id: number; name: string; email: string }) 
     }
 
     try {
-        const token = useCookie("token").value;
         await $fetch(`/api/folders/share/user/${sharingFolder.value.id}`, {
             method: "POST",
             body: {
-                token,
                 userId: user.id
             }
         });
@@ -292,10 +284,8 @@ async function deleteFolder(folder: FolderItem) {
     }
 
     try {
-        const token = useCookie("token").value;
         await $fetch(`/api/folders/delete/${folder.id}`, {
-            method: "POST",
-            body: { token }
+            method: "POST"
         });
 
         emit("folder-deleted", folder.id);

@@ -4,6 +4,8 @@ import { users } from "../database/schema";
 import { userSettings } from "../database/schema";
 
 export default defineEventHandler(async (event) => {
+    enforceRateLimit(event, "register", 5, 60_000);
+
     const body = await readBody(event);
 
     const { username, password, email } = body;

@@ -63,22 +63,13 @@ async function signIn() {
   if (!emailError.value && !passwordError.value) {
     // add api connection here
     try {
-      const res = await $fetch<{ token: string }>('/api/login', {
+      await $fetch<{ success: boolean }>('/api/login', {
         method: 'POST',
         body: {
           email: state.email,
           password: state.password,
         }
       })
-
-      const token = useCookie('token', {
-        maxAge: 172800,
-        sameSite: 'strict',
-        path: '/',
-        secure: false
-      })
-
-      token.value = res.token
 
       await navigateTo('/dashboard')
 

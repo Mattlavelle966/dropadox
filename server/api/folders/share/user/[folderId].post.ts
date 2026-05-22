@@ -2,18 +2,15 @@ import { and, eq } from "drizzle-orm";
 import { folderUserShares, folders, users } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
+    enforceRateLimit(event, "folder-user-share", 60, 60_000);
     const folderId = Number(getRouterParam(event, "folderId"));
-    const { token, userId } = await readBody(event);
+    const { userId } = await readBody(event);
 
     if (!Number.isInteger(folderId) || !userId) {
         throw createError({ statusCode: 400, statusMessage: "Invalid share request" });
     }
 
-    if (!token) {
-        throw createError({ statusCode: 400, statusMessage: "No token provided" });
-    }
-
-    const userPayload = getUserPayload(token);
+    const userPayload = getAuthenticatedUserPayload(event);
     const ownerId = String(userPayload.id);
     const sharedWithUserId = String(userId);
     const db = useDrizzle();

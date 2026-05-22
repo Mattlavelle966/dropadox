@@ -4,6 +4,8 @@ import { User } from '../utils/useDrizzle';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 export default defineEventHandler(async (event) => {
+    enforceRateLimit(event, "login", 10, 60_000);
+
     const body = await readBody(event);
 
     const { email, username, password } = body;
@@ -66,8 +68,9 @@ export default defineEventHandler(async (event) => {
         maxAge: 172800,
         sameSite: "strict",
         path: "/",
-        secure: false
+        secure: process.env.COOKIE_SECURE === "true" || getRequestHeader(event, "x-forwarded-proto") === "https",
+        httpOnly: true
     });
 
-    return { token }
+    return { success: true }
 });

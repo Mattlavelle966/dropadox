@@ -5,8 +5,8 @@ import {eq} from "drizzle-orm";
 export default defineEventHandler(async (event) => {
     const body = await readBody(event);
 
-    const { token, color_mode } = body;
-    const userPayload = getUserPayload(token);
+    const { color_mode } = body;
+    const userPayload = getAuthenticatedUserPayload(event);
     const user = await getUserFromPayload(userPayload);
     if (!user) {
         throw createError({

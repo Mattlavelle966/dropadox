@@ -1,19 +1,21 @@
 import { and, eq } from "drizzle-orm";
 import { folderPublicShares, folders } from "~~/server/database/schema";
 
+function createExpiry() {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+    return expiresAt.toISOString();
+}
+
 export default defineEventHandler(async (event) => {
+    enforceRateLimit(event, "folder-public-share", 30, 60_000);
     const folderId = Number(getRouterParam(event, "folderId"));
-    const { token } = await readBody(event);
 
     if (!Number.isInteger(folderId)) {
         throw createError({ statusCode: 400, statusMessage: "Invalid folder id" });
     }
 
-    if (!token) {
-        throw createError({ statusCode: 400, statusMessage: "No token provided" });
-    }
-
-    const userPayload = getUserPayload(token);
+    const userPayload = getAuthenticatedUserPayload(event);
     const userId = String(userPayload.id);
     const db = useDrizzle();
 
@@ -33,8 +35,15 @@ export default defineEventHandler(async (event) => {
         share = await db.insert(folderPublicShares).values({
             folderId: String(folderId),
             userId,
-            token: crypto.randomUUID()
+            token: crypto.randomUUID(),
+            expiresAt: createExpiry()
         }).returning().get();
+    } else if (!share.expiresAt) {
+        share = await db.update(folderPublicShares)
+            .set({ expiresAt: createExpiry() })
+            .where(eq(folderPublicShares.id, share.id))
+            .returning()
+            .get();
     }
 
     return {
