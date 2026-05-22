@@ -1,11 +1,21 @@
 import { defineEventHandler, sendStream, createError } from "h3";
 import fs from "fs";
-import path from "path";
-import { eq } from "drizzle-orm";
-import { uploads } from "../../database/schema";
+import { and, eq } from "drizzle-orm";
+import { folderUserShares, uploads } from "../../database/schema";
 
 export default defineEventHandler(async (event) => {
   const { id } = event.context.params as { id: string };
+  const token = getCookie(event, "token");
+
+  if (!token) {
+    throw createError({
+      statusCode: 401,
+      statusMessage: "Not authenticated"
+    });
+  }
+
+  const userPayload = getUserPayload(token);
+  const userId = String(userPayload.id);
 
   const db = useDrizzle();
 
@@ -16,7 +26,6 @@ export default defineEventHandler(async (event) => {
     .where(eq(uploads.id, Number(id)))
     .get();
 
-  console.log(record);
   if (!record) {
     throw createError({
       statusCode: 404,
@@ -24,10 +33,27 @@ export default defineEventHandler(async (event) => {
     });
   }
   if (!record.filePath) {
-  throw createError({
-    statusCode: 404,
-    statusMessage: "File path missing in database"
-  });
+    throw createError({
+      statusCode: 404,
+      statusMessage: "File path missing in database"
+    });
+  }
+
+  const isOwner = record.userId === userId;
+  const isSharedWithUser = record.folderId
+    ? await db.select().from(folderUserShares)
+      .where(and(
+        eq(folderUserShares.folderId, record.folderId),
+        eq(folderUserShares.sharedWithUserId, userId)
+      ))
+      .get()
+    : null;
+
+  if (!isOwner && !isSharedWithUser) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: "Not allowed"
+    });
   }
 
   // 2) Build file path from DB

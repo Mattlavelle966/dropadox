@@ -8,6 +8,20 @@
       "when": 1764474266210,
       "tag": "0000_volatile_bloodaxe",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1779462318000,
+      "tag": "0001_folders",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1779463500000,
+      "tag": "0002_folder_shares",
+      "breakpoints": true
     }
   ]
 }

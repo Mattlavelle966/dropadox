@@ -1,7 +1,8 @@
 <template>
     <div class="h-full">
         <div class="flex h-full grow bg-zinc-100 dark:bg-neutral-800/95">
-            <DashboardSidebar>
+            <DashboardSidebar :folders="folders" :selected-folder-id="selectedFolderId"
+                @select-folder="selectFolder" @folder-created="addFolder" @folder-deleted="removeFolder">
                 <div class="p-4 bg-white dark:bg-neutral-900/60 rounded-lg shadow-md flex flex-col gap-2 dark:text-white/80">
                     <h1 class="text-2xl font-bold mb-4">{{t("view.fileDetails.title")}}</h1>
                     <p>{{t("view.fileDetails.fileId")}}: {{ upload.id }}</p>
@@ -20,10 +21,15 @@
 
 <script setup lang="ts">
 import { Download } from 'lucide-vue-next';
-import { getFileName } from '../../../shared/utils/getFileName';
+import { getFileName } from '~~/shared/utils/getFileName';
 const {t} = useI18n();
 const { fileId } = useRoute().params;
 const token = useCookie("token").value;
+
+if (!token) {
+    await navigateTo("/login");
+}
+
 const fileUpload = await $fetch.raw(`/api/files/get/${fileId}`, {
     method: "post",
     body: {
@@ -37,6 +43,34 @@ if(!fileUpload){
 
 
 const upload = (fileUpload._data as any).upload;
+const selectedFolderId = ref<string | null>(upload.folderId ? String(upload.folderId) : null);
+
+const folderData = await $fetch<{ folders: Array<{ id: number; name: string }> }>("/api/folders/list", {
+    method: "POST",
+    body: { token }
+});
+
+const folders = ref(folderData.folders ?? []);
+
+async function selectFolder(folderId: string | null) {
+    await navigateTo({
+        path: "/dashboard",
+        query: folderId ? { folderId } : {}
+    });
+}
+
+function addFolder(folder: { id: number; name: string }) {
+    folders.value = [...folders.value, folder];
+}
+
+function removeFolder(folderId: number) {
+    folders.value = folders.value.filter(folder => folder.id !== folderId);
+
+    if (selectedFolderId.value === String(folderId)) {
+        selectedFolderId.value = null;
+        navigateTo("/dashboard");
+    }
+}
 
 async function download() {
     try {
