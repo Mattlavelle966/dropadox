@@ -33,10 +33,16 @@
             </div>
           </div>
 
-          <Button class="cursor-pointer" @click="download(upload)">
-            <Download />
-            Download
-          </Button>
+          <div class="flex shrink-0 flex-col items-end gap-2">
+            <Button class="cursor-pointer" @click="download(upload)" :disabled="downloadingFileId === upload.id">
+              <Download />
+              Download
+            </Button>
+            <p v-if="downloadMessage && downloadingFileId === upload.id"
+              class="max-w-56 rounded-md bg-blue-50 px-3 py-2 text-right text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-200">
+              {{ downloadMessage }}
+            </p>
+          </div>
         </div>
 
         <p v-if="uploads.length === 0" class="text-zinc-500 dark:text-zinc-400">This folder is empty.</p>
@@ -59,29 +65,53 @@ const data = await $fetch<{
 
 const folder = data.folder;
 const uploads = data.uploads;
+const downloadingFileId = ref<number | null>(null);
+const downloadMessage = ref("");
+let downloadMessageTimeout: ReturnType<typeof setTimeout> | null = null;
 
 function publicPreviewUrl(upload: { id: number }) {
   return `/api/public/preview/${token}/${upload.id}`;
 }
 
 async function download(upload: { id: number; fileName?: string }) {
-  const res = await fetch(`/api/public/download/${token}/${upload.id}`);
-
-  if (!res.ok) {
+  if (downloadingFileId.value === upload.id) {
     return;
   }
 
-  const blob = await res.blob();
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = upload.fileName || "download";
-  a.style.display = "none";
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  window.URL.revokeObjectURL(url);
+  downloadingFileId.value = upload.id;
+  downloadMessage.value = `Preparing download for "${upload.fileName || "file"}"...`;
+
+  try {
+    const a = document.createElement("a");
+    a.href = `/api/public/download/${token}/${upload.id}`;
+    a.download = upload.fileName || "download";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    downloadMessage.value = `Download started for "${upload.fileName || "file"}".`;
+  } catch {
+    downloadMessage.value = "Download could not be started.";
+  } finally {
+    const fileId = upload.id;
+    if (downloadMessageTimeout) {
+      clearTimeout(downloadMessageTimeout);
+    }
+    downloadMessageTimeout = setTimeout(() => {
+      if (downloadingFileId.value === fileId) {
+        downloadingFileId.value = null;
+        downloadMessage.value = "";
+      }
+    }, 3500);
+  }
 }
+
+onBeforeUnmount(() => {
+  if (downloadMessageTimeout) {
+    clearTimeout(downloadMessageTimeout);
+  }
+});
 
 useHead({
   title: `Dropadox - ${folder.name}`

@@ -24,7 +24,8 @@
                     </div>
                 </NuxtLink>
 
-                <button @click="(e) => {e.stopPropagation(); download(); }" class="cursor-pointer hover:text-blue-400">
+                <button @click="(e) => {e.stopPropagation(); download(); }" class="cursor-pointer hover:text-blue-400"
+                    :disabled="downloading">
                     <Download />
                 </button>
 
@@ -33,6 +34,11 @@
                 </button>
             </div>
         </div>
+
+        <p v-if="downloadMessage"
+            class="absolute right-3 top-12 z-10 rounded-md bg-zinc-950 px-3 py-2 text-xs text-white shadow-lg dark:bg-white dark:text-zinc-950">
+            {{ downloadMessage }}
+        </p>
 
         <ClientOnly>
             <Teleport to="body">
@@ -64,10 +70,13 @@ const emit = defineEmits<{
     (e: 'deleted', fileId: number): void
 }>();
 const deleting = ref(false);
+const downloading = ref(false);
+const downloadMessage = ref("");
 const fileCard = ref<HTMLElement | null>(null);
 const showPreview = ref(false);
 const previewStyle = ref<Record<string, string>>({});
 let hidePreviewTimeout: ReturnType<typeof setTimeout> | null = null;
+let downloadMessageTimeout: ReturnType<typeof setTimeout> | null = null;
 const previewUrl = computed(() => `/api/preview/${props.fileId}`);
 const isImage = computed(() => isImageFile(props.fileName));
 const isVideo = computed(() => isVideoFile(props.fileName));
@@ -141,30 +150,34 @@ function openDetails() {
 }
 
 async function download() {
+    if (downloading.value) {
+        return;
+    }
+
+    downloading.value = true;
+    downloadMessage.value = `Preparing download for "${props.fileName || "file"}"...`;
+
     try {
-        const res = await fetch(`/api/download/${props.fileId}`, {
-            method: "GET"
-        });
-
-        if (!res.ok) {
-            console.error("Download failed:", res.status);
-            return;
-        }
-
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-
         const a = document.createElement("a");
-        a.href = url;
+        a.href = `/api/download/${props.fileId}`;
         a.download = props.fileName || "download";
         a.style.display = "none";
         document.body.appendChild(a);
         a.click();
-
         document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
+
+        downloadMessage.value = `Download started for "${props.fileName || "file"}".`;
     } catch (err) {
         console.error("Download error:", err);
+        downloadMessage.value = "Download could not be started.";
+    } finally {
+        downloading.value = false;
+        if (downloadMessageTimeout) {
+            clearTimeout(downloadMessageTimeout);
+        }
+        downloadMessageTimeout = setTimeout(() => {
+            downloadMessage.value = "";
+        }, 3500);
     }
 }
 
@@ -209,6 +222,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     cancelHidePreview();
+    if (downloadMessageTimeout) {
+        clearTimeout(downloadMessageTimeout);
+    }
     window.removeEventListener("resize", updatePreviewPosition);
     window.removeEventListener("scroll", updatePreviewPosition, true);
 });

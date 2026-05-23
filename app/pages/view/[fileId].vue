@@ -16,10 +16,15 @@
                     <p>{{t("view.fileDetails.fileSize")}}: {{ upload.size }} bytes</p>
                     <p>{{t("view.fileDetails.fileName")}}: {{ upload.fileName }}</p>
                     <p>{{t("view.fileDetails.uploadedAt")}}: {{ new Date(upload.createdAt).toLocaleString() }}</p>
-                    <Button @click="download" class="bg-blue-500 hover:bg-blue-400 cursor-pointer hover:scale-[101%]">
+                    <Button @click="download" class="bg-blue-500 hover:bg-blue-400 cursor-pointer hover:scale-[101%]"
+                        :disabled="downloading">
                         <Download />
                         {{t("common.words.download")}}
                     </Button>
+                    <p v-if="downloadMessage"
+                        class="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-700 dark:bg-blue-950/40 dark:text-blue-200">
+                        {{ downloadMessage }}
+                    </p>
                 </div>
             </DashboardSidebar>
         </div>
@@ -59,6 +64,9 @@ const isAudio = isAudioFile(upload.fileName);
 const isPdf = isPdfFile(upload.fileName);
 const isHtmlPreview = isHtmlPreviewFile(upload.fileName);
 const selectedFolderId = ref<string | null>(upload.folderId ? String(upload.folderId) : null);
+const downloading = ref(false);
+const downloadMessage = ref("");
+let downloadMessageTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const folderData = await $fetch<{ folders: Array<{ id: number; name: string }> }>("/api/folders/list", {
     method: "POST"
@@ -93,32 +101,42 @@ function removeFolder(folderId: number) {
 }
 
 async function download() {
+    if (downloading.value) {
+        return;
+    }
+
+    downloading.value = true;
+    downloadMessage.value = `Preparing download for "${upload.fileName || "file"}"...`;
+
     try {
-        const res = await fetch(`/api/download/${fileId}`, {
-            method: "GET"
-        });
-
-        if (!res.ok) {
-            console.error("Download failed:", res.status);
-            return;
-        }
-
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-
         const a = document.createElement("a");
-        a.href = url;
+        a.href = `/api/download/${fileId}`;
         a.download = upload.fileName || "download";
         a.style.display = "none";
         document.body.appendChild(a);
         a.click();
-
         document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
+
+        downloadMessage.value = `Download started for "${upload.fileName || "file"}".`;
     } catch (err) {
         console.error("Download error:", err);
+        downloadMessage.value = "Download could not be started.";
+    } finally {
+        downloading.value = false;
+        if (downloadMessageTimeout) {
+            clearTimeout(downloadMessageTimeout);
+        }
+        downloadMessageTimeout = setTimeout(() => {
+            downloadMessage.value = "";
+        }, 3500);
     }
 }
+
+onBeforeUnmount(() => {
+    if (downloadMessageTimeout) {
+        clearTimeout(downloadMessageTimeout);
+    }
+});
 
 useHead({
   title: t("common.siteName") + " - " + upload.fileName
