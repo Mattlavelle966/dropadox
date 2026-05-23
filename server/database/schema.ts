@@ -7,6 +7,7 @@ export const users = sqliteTable("users", {
     password: text("password").notNull(),
     email: text("email").notNull(),
     role: text("role").notNull().default("user"),
+    storageMaxBytes: int("storage_max_bytes").notNull().default(13_000_000_000),
     createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
 })
 
@@ -23,6 +24,7 @@ export const uploads = sqliteTable("uploads", {
 export const folders = sqliteTable("folders", {
     id: int("id").primaryKey({ autoIncrement: true }),
     userId: text("user_id").references(() => users.id),
+    parentId: text("parent_id"),
     name: text("name").notNull(),
     iconPath: text("icon_path"),
     createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
@@ -62,4 +64,11 @@ export const userSettings = sqliteTable("userSettings", {
     colorMode: text("color_mode").default('light'),
     searchVisible: text("search_visible").default('true'),
     avatarPath: text("avatar_path"),
+})
+
+export const ipBlacklist = sqliteTable("ipBlacklist", {
+    id: int("id").primaryKey({ autoIncrement: true }),
+    ipAddress: text("ip_address").notNull(),
+    reason: text("reason").notNull().default("captcha_failed"),
+    createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
 })

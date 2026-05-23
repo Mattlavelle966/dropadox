@@ -7,9 +7,17 @@
         "files": "files",
         "published": "published",
         "likes": "likes",
+        "blacklistedIps": "Blacklisted IPs",
+        "noBlacklistedIps": "No IPs are currently blacklisted.",
+        "ipAddress": "IP address",
+        "reason": "Reason",
+        "removeIp": "Remove IP",
         "deleteUser": "Delete user",
         "deleteFolder": "Delete folder",
+        "storage": "Storage",
+        "storageGb": "Storage GB",
         "confirmDeleteUser": "Delete {email} and all folders/files they own? This cannot be undone.",
-        "confirmDeleteFolder": "Delete folder \"{name}\" and all files inside it? This cannot be undone."
+        "confirmDeleteFolder": "Delete folder \"{name}\" and all files inside it? This cannot be undone.",
+        "confirmDeleteIp": "Remove {ip} from the blacklist?"
     }
 }

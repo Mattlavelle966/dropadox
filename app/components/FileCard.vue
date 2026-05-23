@@ -46,14 +46,14 @@
                     @mouseleave="scheduleHidePreview"
                     class="fixed z-[1000] overflow-hidden rounded-lg border border-zinc-300 bg-white text-zinc-950 shadow-2xl [color-scheme:light]">
                     <img v-if="isImage" :src="previewUrl" :alt="props.fileName"
-                        class="max-h-72 w-full object-contain bg-white" loading="lazy" />
-                    <video v-else-if="isVideo" :src="previewUrl" class="max-h-72 w-full bg-black" muted
+                        class="max-h-[var(--preview-height)] w-full object-contain bg-white" loading="lazy" />
+                    <video v-else-if="isVideo" :src="previewUrl" class="max-h-[var(--preview-height)] w-full bg-black" muted
                         preload="metadata" />
                     <div v-else-if="isAudio" class="p-3">
                         <audio :src="previewUrl" class="w-full" controls preload="metadata" />
                     </div>
-                    <iframe v-else-if="isPdf" :src="previewUrl" class="h-72 w-full bg-white [color-scheme:light]" />
-                    <iframe v-else :src="previewUrl" class="h-72 w-full bg-white [color-scheme:light]" sandbox />
+                    <iframe v-else-if="isPdf" :src="previewUrl" class="h-[var(--preview-height)] w-full bg-white [color-scheme:light]" />
+                    <iframe v-else :src="previewUrl" class="h-[var(--preview-height)] w-full bg-white [color-scheme:light]" sandbox />
                 </div>
             </Teleport>
         </ClientOnly>
@@ -97,9 +97,10 @@ function updatePreviewPosition() {
     }
 
     const padding = 16;
-    const previewHeight = 304;
     const rowRect = fileCard.value.getBoundingClientRect();
-    const width = Math.min(448, window.innerWidth - padding * 2);
+    const availableWidth = window.innerWidth - padding * 2;
+    const width = Math.min(384, availableWidth, Math.max(240, Math.round(window.innerWidth * 0.32)));
+    const previewHeight = Math.min(256, Math.max(176, Math.round(window.innerHeight * 0.38)));
     let left = Math.min(rowRect.left, window.innerWidth - width - padding);
     let top = rowRect.bottom + 8;
 
@@ -116,7 +117,8 @@ function updatePreviewPosition() {
     previewStyle.value = {
         left: `${left}px`,
         top: `${top}px`,
-        width: `${width}px`
+        width: `${width}px`,
+        "--preview-height": `${previewHeight}px`
     };
 }
 

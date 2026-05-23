@@ -1,11 +1,12 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { folders } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
     enforceRateLimit(event, "folder-create", 30, 60_000);
-    const { name } = await readBody(event);
+    const { name, parentId } = await readBody(event);
 
     const folderName = String(name ?? "").trim();
+    const parentFolderId = parentId ? String(parentId) : null;
 
     if (!folderName) {
         throw createError({
@@ -22,11 +23,29 @@ export default defineEventHandler(async (event) => {
     }
 
     const userPayload = getAuthenticatedUserPayload(event);
+    const db = useDrizzle();
+    const ownerId = String(userPayload.id);
+    let parentAccess = null;
+    let canonicalOwnerId = ownerId;
 
-    const existingFolder = await useDrizzle().select().from(folders)
+    if (parentFolderId) {
+        parentAccess = await getFolderAccess(db, parentFolderId, ownerId);
+
+        if (!parentAccess || (!parentAccess.isOwner && !parentAccess.isSharedWithUser)) {
+            throw createError({
+                statusCode: 404,
+                statusMessage: "Parent folder not found"
+            });
+        }
+
+        canonicalOwnerId = String(parentAccess.folder.userId);
+    }
+
+    const existingFolder = await db.select().from(folders)
         .where(and(
-            eq(folders.userId, String(userPayload.id)),
-            eq(folders.name, folderName)
+            eq(folders.userId, canonicalOwnerId),
+            eq(folders.name, folderName),
+            parentFolderId ? eq(folders.parentId, parentFolderId) : isNull(folders.parentId)
         ))
         .get();
 
@@ -37,8 +56,9 @@ export default defineEventHandler(async (event) => {
         });
     }
 
-    const folder = await useDrizzle().insert(folders).values({
-        userId: String(userPayload.id),
+    const folder = await db.insert(folders).values({
+        userId: canonicalOwnerId,
+        parentId: parentFolderId,
         name: folderName
     }).returning().get();
 

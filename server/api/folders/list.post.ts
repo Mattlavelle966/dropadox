@@ -1,30 +1,27 @@
-import { eq } from "drizzle-orm";
-import { folderUserShares, folders } from "~~/server/database/schema";
+import { getFolderPeopleMetadata, getUsersByIdMetadata } from "~~/server/utils/peopleMetadata";
 
 export default defineEventHandler(async (event) => {
     const userPayload = getAuthenticatedUserPayload(event);
 
     const db = useDrizzle();
-    const userFolders = await db.select().from(folders)
-        .where(eq(folders.userId, String(userPayload.id)))
-        .all();
-
-    const sharedFolders = await db.select({
-        id: folders.id,
-        userId: folders.userId,
-        name: folders.name,
-        iconPath: folders.iconPath,
-        createdAt: folders.createdAt,
-        accessRole: folderUserShares.role
-    }).from(folderUserShares)
-        .innerJoin(folders, eq(folderUserShares.folderId, folders.id))
-        .where(eq(folderUserShares.sharedWithUserId, String(userPayload.id)))
-        .all();
+    const accessibleFolders = await getAccessibleFolderRows(db, String(userPayload.id));
+    const folderIds = accessibleFolders.map(({ folder }) => folder.id);
+    const primaryOwners = await getUsersByIdMetadata(db, accessibleFolders.map(({ folder }) => folder.userId));
+    const { folderPeople } = await getFolderPeopleMetadata(db, folderIds);
 
     return {
-        folders: [
-            ...userFolders.map(folder => folderResponse(folder, false, "owner")),
-            ...sharedFolders.map(folder => folderResponse(folder, true, folder.accessRole ?? "member"))
-        ]
+        folders: accessibleFolders.map(({ folder, shared, accessRole }) => {
+            const primaryOwner = folder.userId ? primaryOwners.get(Number(folder.userId)) ?? null : null;
+            const people = folderPeople.get(String(folder.id)) ?? { owners: [], sharedUsers: [] };
+
+            return {
+                ...folderResponse(folder, shared, accessRole),
+                owners: [
+                    ...(primaryOwner ? [{ ...primaryOwner, role: "owner" }] : []),
+                    ...people.owners
+                ],
+                sharedUsers: people.sharedUsers
+            };
+        })
     };
 });

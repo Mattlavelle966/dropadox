@@ -1,4 +1,6 @@
 import { createError, getRequestHeader, type H3Event } from "h3";
+import { eq } from "drizzle-orm";
+import { ipBlacklist } from "~~/server/database/schema";
 
 type Bucket = {
     count: number;
@@ -7,7 +9,7 @@ type Bucket = {
 
 const buckets = new Map<string, Bucket>();
 
-function getClientAddress(event: H3Event) {
+export function getClientAddress(event: H3Event) {
     if (process.env.TRUST_PROXY === "true") {
         const forwardedFor = getRequestHeader(event, "x-forwarded-for");
         const forwardedAddress = forwardedFor?.split(",")[0]?.trim();
@@ -39,6 +41,36 @@ export function enforceRateLimit(event: H3Event, key: string, limit: number, win
         throw createError({
             statusCode: 429,
             statusMessage: "Too many requests"
+        });
+    }
+}
+
+export async function blacklistClientAddress(event: H3Event, reason = "captcha_failed") {
+    const ipAddress = getClientAddress(event);
+    const db = useDrizzle();
+    const existing = await db.select().from(ipBlacklist)
+        .where(eq(ipBlacklist.ipAddress, ipAddress))
+        .get();
+
+    if (!existing) {
+        await db.insert(ipBlacklist).values({
+            ipAddress,
+            reason
+        });
+    }
+
+    return ipAddress;
+}
+
+export async function enforceIpBlacklist(event: H3Event) {
+    const blockedIp = await useDrizzle().select().from(ipBlacklist)
+        .where(eq(ipBlacklist.ipAddress, getClientAddress(event)))
+        .get();
+
+    if (blockedIp) {
+        throw createError({
+            statusCode: 403,
+            statusMessage: "IP address is blacklisted"
         });
     }
 }

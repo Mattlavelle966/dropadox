@@ -14,6 +14,16 @@ export async function deleteFolderWithContents(db: any, folderId: number | strin
         };
     }
 
+    let deletedFiles = 0;
+    const childFolders = await db.select().from(folders)
+        .where(eq(folders.parentId, String(id)))
+        .all();
+
+    for (const childFolder of childFolders) {
+        const childResult = await deleteFolderWithContents(db, childFolder.id);
+        deletedFiles += childResult.deletedFiles;
+    }
+
     const folderUploads = await db.select().from(uploads)
         .where(eq(uploads.folderId, String(id)))
         .all();
@@ -31,6 +41,6 @@ export async function deleteFolderWithContents(db: any, folderId: number | strin
 
     return {
         deleted: true,
-        deletedFiles: folderUploads.length
+        deletedFiles: deletedFiles + folderUploads.length
     };
 }

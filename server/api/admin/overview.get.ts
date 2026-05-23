@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
-import { folderPublishedShares, folders, uploads, userSettings, users } from "~~/server/database/schema";
+import { folderPublishedShares, folders, ipBlacklist, uploads, userSettings, users } from "~~/server/database/schema";
+import { getUserStorageBytes } from "~~/server/database/userStorage";
 
 export default defineEventHandler(async (event) => {
     await requireAdmin(event);
@@ -10,6 +11,7 @@ export default defineEventHandler(async (event) => {
         name: users.name,
         email: users.email,
         role: users.role,
+        storageMaxBytes: users.storageMaxBytes,
         createdAt: users.createdAt,
         avatarPath: userSettings.avatarPath,
         folderCount: sql<number>`(
@@ -44,6 +46,15 @@ export default defineEventHandler(async (event) => {
     const rootFileCount = await db.select({ count: sql<number>`count(*)` }).from(uploads)
         .where(sql`${uploads.folderId} is null`)
         .get();
+    const blacklistedIpRows = await db.select().from(ipBlacklist)
+        .orderBy(ipBlacklist.id)
+        .all();
+
+    const userStorage = new Map<number, number>();
+
+    for (const user of userRows) {
+        userStorage.set(user.id, await getUserStorageBytes(String(user.id)));
+    }
 
     return {
         users: userRows.map((user) => ({
@@ -52,6 +63,8 @@ export default defineEventHandler(async (event) => {
             email: user.email,
             role: user.role,
             createdAt: user.createdAt,
+            storageUsedBytes: userStorage.get(user.id) ?? 0,
+            storageMaxBytes: user.storageMaxBytes,
             folderCount: Number(user.folderCount ?? 0),
             avatarUrl: userAvatarUrl(user.id, user.avatarPath)
         })),
@@ -67,10 +80,17 @@ export default defineEventHandler(async (event) => {
             published: Boolean(folder.publishedToken),
             likes: folder.publishedLikes ?? 0
         })),
+        blacklistedIps: blacklistedIpRows.map((row) => ({
+            id: row.id,
+            ipAddress: row.ipAddress,
+            reason: row.reason,
+            createdAt: row.createdAt
+        })),
         totals: {
             users: userRows.length,
             folders: folderRows.length,
-            rootFiles: Number(rootFileCount?.count ?? 0)
+            rootFiles: Number(rootFileCount?.count ?? 0),
+            blacklistedIps: blacklistedIpRows.length
         }
     };
 });

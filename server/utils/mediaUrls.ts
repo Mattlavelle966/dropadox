@@ -14,6 +14,7 @@ export function folderResponse(folder: any, shared = false, accessRole = "owner"
     return {
         id: folder.id,
         userId: folder.userId,
+        parentId: folder.parentId ?? null,
         name: folder.name,
         createdAt: folder.createdAt,
         shared,

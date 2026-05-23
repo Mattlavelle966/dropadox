@@ -1,37 +1,37 @@
 <template>
-  <div class="min-h-full bg-zinc-300 dark:bg-neutral-800 flex flex-col select-none">
+  <div class="min-h-full bg-zinc-100 dark:bg-neutral-900 flex flex-col select-none">
 
-    <main class="home-main flex flex-1 flex-col px-4 dark:text-white/80">
-      <section class="home-hero flex min-h-[34vh] flex-col items-center justify-center text-center">
-        <h2 class="text-4xl md:text-6xl font-extrabold drop-shadow-md text-shadow-xs text-blue-500 dark:text-white/80">
+    <main class="home-main mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 dark:text-white/80">
+      <section class="home-hero flex min-h-36 flex-col justify-center border-b border-zinc-300 py-8 dark:border-neutral-700">
+        <h2 class="text-3xl md:text-4xl font-extrabold text-zinc-950 dark:text-white">
           {{ t("index.h2") }}
         </h2>
 
-        <p class="dark:text-white/60 mt-4 text-lg max-w-xl">
+        <p class="dark:text-white/60 mt-2 max-w-xl text-base text-zinc-600">
           {{ t("index.tagLine") }}
         </p>
       </section>
 
-      <section class="mx-auto flex w-full max-w-5xl flex-col gap-3 pb-8">
-        <div class="published-header flex items-center justify-between gap-3">
-          <h3 class="text-xl font-bold text-zinc-900 dark:text-white">{{ t("index.publishedFolders") }}</h3>
+      <section class="flex w-full flex-col gap-3 py-4">
+        <div class="published-header flex items-center justify-between gap-3 border-b border-zinc-300 pb-2 dark:border-neutral-700">
+          <h3 class="text-lg font-bold text-zinc-900 dark:text-white">{{ t("index.publishedFolders") }}</h3>
           <span class="text-sm text-zinc-600 dark:text-zinc-400">{{ t("index.sortedByLikes") }}</span>
         </div>
 
-        <div v-if="publishedFolders.length" class="published-grid grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div v-if="publishedFolders.length" class="published-grid flex flex-col">
           <article v-for="folder in publishedFolders" :key="folder.token"
-            class="published-card flex min-h-56 min-w-0 flex-col justify-between rounded-lg border border-zinc-300 bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
+            class="published-card flex min-w-0 flex-col border-x border-b border-zinc-300 bg-white p-4 first:border-t dark:border-neutral-700 dark:bg-neutral-950">
             <div class="flex min-w-0 items-start gap-3">
               <img v-if="folder.folder.iconUrl" :src="folder.folder.iconUrl" :alt="folder.folder.name"
-                class="h-12 w-12 rounded-md object-cover" />
-              <div v-else class="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-zinc-200 dark:bg-neutral-800">
+                class="h-12 w-12 object-cover" />
+              <div v-else class="flex h-12 w-12 shrink-0 items-center justify-center bg-zinc-200 dark:bg-neutral-800">
                 <Folder class="h-6 w-6 opacity-70" />
               </div>
               <div class="min-w-0">
                 <h4 class="truncate font-semibold text-zinc-900 dark:text-white">{{ folder.folder.name }}</h4>
                 <div class="mt-1 flex min-w-0 items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
                   <img v-if="folder.owner.avatarUrl" :src="folder.owner.avatarUrl" :alt="folder.owner.username"
-                    class="h-5 w-5 shrink-0 rounded-full object-cover" />
+                    class="h-5 w-5 shrink-0 object-cover" />
                   <span class="truncate">{{ folder.owner.username }}</span>
                 </div>
               </div>
@@ -52,7 +52,7 @@
           </article>
         </div>
 
-        <p v-else class="rounded-lg border border-zinc-300 bg-white p-4 text-sm text-zinc-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-zinc-400">
+        <p v-else class="border border-zinc-300 bg-white p-4 text-sm text-zinc-600 dark:border-neutral-700 dark:bg-neutral-950 dark:text-zinc-400">
           {{ t("index.noPublishedFolders") }}
         </p>
       </section>
@@ -180,22 +180,12 @@ useHead({
     padding-inline: 0.75rem;
   }
 
-  .home-hero {
-    min-height: 28vh;
-    padding-block: 2rem;
-  }
-
   .published-header {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .published-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .published-card {
-    min-height: 12rem;
     padding: 0.875rem;
   }
 

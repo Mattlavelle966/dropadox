@@ -4,8 +4,7 @@ import path from "path";
 import { uploads } from "../database/schema";
 import { getUserStorageBytes } from "../database/userStorage";
 import { getUploadDir, safeFileName } from "../utils/fileStorage";
-
-const DEFAULT_MAX_BYTES = 10_000_000_000;
+import { getUserStorageMaxBytes } from "../utils/storageQuota";
 
 type ParsedUpload = {
     filename?: string;
@@ -21,11 +20,32 @@ function removeFileIfExists(filePath?: string) {
     }
 }
 
-function getMaxBytes() {
-    const configuredMaxBytes = Number(process.env.MAX_USER_STORAGE_BYTES);
-    return Number.isFinite(configuredMaxBytes) && configuredMaxBytes > 0
-        ? configuredMaxBytes
-        : DEFAULT_MAX_BYTES;
+async function assertStorageCapacity(db: any, ownerId: string, fileBytes: number) {
+    const maxBytes = await getUserStorageMaxBytes(db, ownerId);
+    const usedBytes = await getUserStorageBytes(ownerId);
+
+    if (fileBytes > maxBytes) {
+        throw createError({
+            statusCode: 413,
+            statusMessage: "FILE_TOO_LARGE",
+            data: {
+                maxBytes,
+                fileBytes
+            }
+        });
+    }
+
+    if (usedBytes + fileBytes > maxBytes) {
+        throw createError({
+            statusCode: 413,
+            statusMessage: "MAXIMUM_STORAGE_REACHED",
+            data: {
+                maxBytes,
+                usedBytes,
+                fileBytes
+            }
+        });
+    }
 }
 
 async function parseUpload(event: any, maxBytes: number, limitStatus = "FILE_TOO_LARGE"): Promise<ParsedUpload> {
@@ -115,8 +135,10 @@ export default defineEventHandler(async (event) => {
     try {
         enforceRateLimit(event, "upload", 20, 60_000);
         const userPayload = getAuthenticatedUserPayload(event);
-        const maxBytes = getMaxBytes();
-        const usedBytes = await getUserStorageBytes(String(userPayload.id));
+        const db = useDrizzle();
+        const userId = String(userPayload.id);
+        const maxBytes = await getUserStorageMaxBytes(db, userId);
+        const usedBytes = await getUserStorageBytes(userId);
         const remainingBytes = maxBytes - usedBytes;
 
         if (remainingBytes <= 0) {
@@ -144,12 +166,11 @@ export default defineEventHandler(async (event) => {
             });
         }
 
-        const db = useDrizzle();
-        const userId = String(userPayload.id);
         const folderId = parsed.folderId ? String(parsed.folderId) : null;
+        let folderAccess = null;
 
         if (folderId) {
-            const folderAccess = await getFolderAccess(db, folderId, userId);
+            folderAccess = await getFolderAccess(db, folderId, userId);
 
             if (!folderAccess || (!folderAccess.isOwner && !folderAccess.isSharedWithUser)) {
                 throw createError({
@@ -159,32 +180,12 @@ export default defineEventHandler(async (event) => {
             }
         }
 
-        if (parsed.size > maxBytes) {
-            throw createError({
-                statusCode: 413,
-                statusMessage: "FILE_TOO_LARGE",
-                data: {
-                    maxBytes,
-                    fileBytes: parsed.size
-                }
-            });
-        }
-
-        if (usedBytes + parsed.size > maxBytes) {
-            throw createError({
-                statusCode: 413,
-                statusMessage: "MAXIMUM_STORAGE_REACHED",
-                data: {
-                    maxBytes,
-                    usedBytes,
-                    fileBytes: parsed.size
-                }
-            });
-        }
+        const storageOwnerId = folderAccess ? String(folderAccess.folder.userId) : userId;
+        await assertStorageCapacity(db, storageOwnerId, parsed.size);
 
         const upload = await db.insert(uploads)
             .values({
-                userId,
+                userId: storageOwnerId,
                 folderId,
                 filePath: parsed.uploadPath,
                 privacyFlag: "private",

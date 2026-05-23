@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { folders, uploads } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
@@ -21,6 +21,7 @@ export default defineEventHandler(async (event) => {
 
     const requestedName = String(name ?? "").trim();
     let folderName = requestedName || `Copy of ${folderAccess.folder.name}`;
+    const parentId = folderAccess.folder.parentId ? String(folderAccess.folder.parentId) : null;
 
     if (folderName.length > 80) {
         throw createError({ statusCode: 400, statusMessage: "Folder name is too long" });
@@ -30,7 +31,8 @@ export default defineEventHandler(async (event) => {
         const existingFolder = await db.select().from(folders)
             .where(and(
                 eq(folders.userId, userId),
-                eq(folders.name, folderName)
+                eq(folders.name, folderName),
+                parentId ? eq(folders.parentId, parentId) : isNull(folders.parentId)
             ))
             .get();
 
@@ -44,6 +46,7 @@ export default defineEventHandler(async (event) => {
     const clonedFolder = await db.insert(folders)
         .values({
             userId,
+            parentId,
             name: folderName
         })
         .returning()
@@ -63,8 +66,44 @@ export default defineEventHandler(async (event) => {
         });
     }
 
+    await cloneChildFolders(db, String(folderId), String(clonedFolder.id), userId);
+
     return {
         folder: folderResponse(clonedFolder, false, "owner"),
         clonedFiles: sourceUploads.length
     };
 });
+
+async function cloneChildFolders(db: any, sourceParentId: string, targetParentId: string, userId: string) {
+    const childFolders = await db.select().from(folders)
+        .where(eq(folders.parentId, sourceParentId))
+        .all();
+
+    for (const childFolder of childFolders) {
+        const clonedChild = await db.insert(folders)
+            .values({
+                userId,
+                parentId: targetParentId,
+                name: childFolder.name,
+                iconPath: childFolder.iconPath
+            })
+            .returning()
+            .get();
+
+        const childUploads = await db.select().from(uploads)
+            .where(eq(uploads.folderId, String(childFolder.id)))
+            .all();
+
+        for (const upload of childUploads) {
+            await db.insert(uploads).values({
+                userId,
+                folderId: String(clonedChild.id),
+                filePath: upload.filePath,
+                privacyFlag: upload.privacyFlag,
+                size: upload.size
+            });
+        }
+
+        await cloneChildFolders(db, String(childFolder.id), String(clonedChild.id), userId);
+    }
+}

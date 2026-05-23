@@ -5,7 +5,15 @@ import { uploads } from "../../database/schema";
 import { setDownloadHeaders } from "../../utils/fileStorage";
 
 export default defineEventHandler(async (event) => {
-  const { id } = event.context.params as { id: string };
+  const fileId = Number(getRouterParam(event, "id"));
+
+  if (!Number.isInteger(fileId)) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: "Invalid file id"
+    });
+  }
+
   const userPayload = getAuthenticatedUserPayload(event);
   const userId = String(userPayload.id);
 
@@ -15,7 +23,7 @@ export default defineEventHandler(async (event) => {
   const record = await db
     .select()
     .from(uploads)
-    .where(eq(uploads.id, Number(id)))
+    .where(eq(uploads.id, fileId))
     .get();
 
   if (!record) {
