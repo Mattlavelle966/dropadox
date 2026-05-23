@@ -2,8 +2,17 @@
   <div class="min-h-dvh bg-zinc-100 p-6 dark:bg-neutral-900">
     <main class="mx-auto flex max-w-3xl flex-col gap-4">
       <header class="border-b border-zinc-300 pb-4 dark:border-neutral-700">
-        <h1 class="text-2xl font-bold text-zinc-900 dark:text-white">{{ folder.name }}</h1>
-        <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ uploads.length }} files</p>
+        <div class="flex items-center gap-3">
+          <img v-if="folder.iconUrl" :src="folder.iconUrl" :alt="folder.name"
+            class="h-12 w-12 rounded-md object-cover" />
+          <div v-else class="flex h-12 w-12 items-center justify-center rounded-md bg-white dark:bg-neutral-800">
+            <Folder class="h-6 w-6 text-zinc-500" />
+          </div>
+          <div>
+            <h1 class="text-2xl font-bold text-zinc-900 dark:text-white">{{ folder.name }}</h1>
+            <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ uploads.length }} files</p>
+          </div>
+        </div>
       </header>
 
       <div class="flex flex-col gap-3">
@@ -37,14 +46,14 @@
 </template>
 
 <script setup lang="ts">
-import { Download, File } from "lucide-vue-next";
+import { Download, File, Folder } from "lucide-vue-next";
 import { isAudioFile, isHtmlPreviewFile, isImageFile, isPdfFile, isVideoFile } from "~~/shared/utils/fileType";
 
 const route = useRoute();
 const token = String(route.params.token);
 
 const data = await $fetch<{
-  folder: { id: number; name: string };
+  folder: { id: number; name: string; iconUrl?: string | null };
   uploads: Array<{ id: number; fileName?: string; size?: number }>;
 }>(`/api/public/folders/${token}`);
 

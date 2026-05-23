@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { folderUserShares, folders, users } from "~~/server/database/schema";
+import { folderUserShares, folders, userSettings, users } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
     enforceRateLimit(event, "folder-user-share", 60, 60_000);
@@ -58,10 +58,16 @@ export default defineEventHandler(async (event) => {
             });
         }
 
+        const targetSettings = await db.select().from(userSettings)
+            .where(eq(userSettings.userID, targetUserId))
+            .get();
+
         sharedUsers.push({
             id: targetUser.id,
             name: targetUser.name,
-            email: targetUser.email
+            username: targetUser.name,
+            email: targetUser.email,
+            avatarUrl: userAvatarUrl(targetUser.id, targetSettings?.avatarPath)
         });
     }
 

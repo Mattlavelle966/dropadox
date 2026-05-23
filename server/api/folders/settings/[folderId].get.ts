@@ -1,5 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
-import { folderPublicShares, folderUserShares, folders, users } from "~~/server/database/schema";
+import { folderPublicShares, folderUserShares, folders, userSettings, users } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
     const folderId = Number(getRouterParam(event, "folderId"));
@@ -37,9 +37,11 @@ export default defineEventHandler(async (event) => {
         id: users.id,
         name: users.name,
         email: users.email,
+        avatarPath: userSettings.avatarPath,
         createdAt: folderUserShares.createdAt
     }).from(folderUserShares)
         .innerJoin(users, sql`${folderUserShares.sharedWithUserId} = cast(${users.id} as text)`)
+        .leftJoin(userSettings, sql`${userSettings.userID} = cast(${users.id} as text)`)
         .where(and(
             eq(folderUserShares.folderId, String(folderId)),
             eq(folderUserShares.ownerId, userId)
@@ -47,11 +49,19 @@ export default defineEventHandler(async (event) => {
         .all();
 
     return {
-        folder,
+        folder: folderResponse(folder, false),
         publicShares: publicShares.map((share) => ({
             ...share,
             url: `/share/folder/${share.token}`
         })),
-        sharedUsers
+        sharedUsers: sharedUsers.map((user) => ({
+            shareId: user.shareId,
+            id: user.id,
+            name: user.name,
+            username: user.name,
+            email: user.email,
+            avatarUrl: userAvatarUrl(user.id, user.avatarPath),
+            createdAt: user.createdAt
+        }))
     };
 });

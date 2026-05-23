@@ -7,6 +7,12 @@
             "dark": "Dark",
             "system": "System Default"
         },
+        "profileImage": {
+            "label": "Profile image",
+            "description": "This image appears in the header, folder sharing search, and shared-folder access lists.",
+            "remove": "Remove profile image",
+            "error": "Could not update profile image."
+        },
         "privacy": {
             "searchVisibleLabel": "Show me in user search",
             "searchVisibleDescription": "Turn this off to make your account private. Other users will not find you when sharing folders by search."

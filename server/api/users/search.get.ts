@@ -14,7 +14,12 @@ export default defineEventHandler(async (event) => {
     const results = await useDrizzle().select({
         id: users.id,
         name: users.name,
-        email: users.email
+        email: users.email,
+        avatarPath: sql<string | null>`(
+            select avatar_path from userSettings
+            where userSettings.user_id = cast(${users.id} as text)
+            limit 1
+        )`
     }).from(users)
         .where(and(
             or(
@@ -31,5 +36,13 @@ export default defineEventHandler(async (event) => {
         .limit(10)
         .all();
 
-    return { users: results };
+    return {
+        users: results.map((user) => ({
+            id: user.id,
+            name: user.name,
+            username: user.name,
+            email: user.email,
+            avatarUrl: userAvatarUrl(user.id, user.avatarPath)
+        }))
+    };
 });

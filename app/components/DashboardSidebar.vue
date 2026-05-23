@@ -16,7 +16,9 @@
                 <Button variant="ghost"
                     class="min-w-0 flex-1 justify-start cursor-pointer hover:bg-transparent"
                     @click="emit('select-folder', String(folder.id))">
-                    <Folder class="w-4 h-4 mr-2" />
+                    <img v-if="folder.iconUrl" :src="folder.iconUrl" :alt="folder.name"
+                        class="mr-2 h-5 w-5 rounded object-cover" />
+                    <Folder v-else class="w-4 h-4 mr-2" />
                     <span class="truncate">{{ folder.name }}</span>
                     <span v-if="folder.shared" class="ml-1 text-xs opacity-60">{{ t('dashboard.shared') }}</span>
                 </Button>
@@ -109,6 +111,27 @@
                     <p v-if="settingsMessage" class="text-sm text-green-600">{{ settingsMessage }}</p>
 
                     <section class="flex flex-col gap-2">
+                        <h3 class="text-sm font-semibold">{{ t('dashboard.folderIcon') }}</h3>
+                        <div class="flex items-center gap-3">
+                            <img v-if="settingsFolder?.iconUrl" :src="settingsFolder.iconUrl" :alt="settingsFolder.name"
+                                class="h-14 w-14 rounded-md object-cover" />
+                            <div v-else
+                                class="flex h-14 w-14 items-center justify-center rounded-md bg-zinc-200 dark:bg-neutral-800">
+                                <Folder class="h-6 w-6 opacity-70" />
+                            </div>
+                            <div class="flex flex-1 flex-col gap-2">
+                                <Input type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/bmp"
+                                    @change="uploadFolderIcon" />
+                                <Button v-if="settingsFolder?.iconUrl" variant="ghost"
+                                    class="cursor-pointer justify-start text-red-600 hover:text-red-600"
+                                    @click="removeFolderIcon">
+                                    {{ t('dashboard.removeFolderIcon') }}
+                                </Button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="flex flex-col gap-2">
                         <h3 class="text-sm font-semibold">{{ t('dashboard.renameFolder') }}</h3>
                         <div class="flex gap-2">
                             <Input v-model="settingsFolderName" :placeholder="t('dashboard.folderName')" />
@@ -140,9 +163,17 @@
                         <div v-if="sharedUsers.length" class="flex flex-col gap-2">
                             <div v-for="user in sharedUsers" :key="user.id"
                                 class="flex items-center justify-between gap-3 rounded-md border border-zinc-300 p-2 text-sm dark:border-neutral-700">
-                                <div class="min-w-0">
-                                    <span class="block truncate font-medium">{{ user.name }}</span>
-                                    <span class="block truncate opacity-70">{{ user.email }}</span>
+                                <div class="flex min-w-0 items-center gap-3">
+                                    <img v-if="user.avatarUrl" :src="user.avatarUrl" :alt="user.name"
+                                        class="h-9 w-9 rounded-full object-cover" />
+                                    <div v-else
+                                        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-xs font-bold text-zinc-700 dark:bg-neutral-800 dark:text-white">
+                                        {{ initials(user.name || user.email) }}
+                                    </div>
+                                    <div class="min-w-0">
+                                        <span class="block truncate font-medium">{{ user.name }}</span>
+                                        <span class="block truncate opacity-70">{{ user.email }}</span>
+                                    </div>
                                 </div>
                                 <Button variant="ghost" class="h-8 cursor-pointer text-red-600 hover:text-red-600"
                                     @click="removeSharedUser(user)">
@@ -168,10 +199,18 @@
 
                         <div class="flex flex-col gap-2">
                             <button v-for="user in userResults" :key="user.id"
-                                class="rounded-md border border-zinc-300 p-2 text-left text-sm hover:bg-zinc-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+                                class="flex items-center gap-3 rounded-md border border-zinc-300 p-2 text-left text-sm hover:bg-zinc-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
                                 @click="selectUser(user)">
-                                <span class="font-medium">{{ user.name }}</span>
-                                <span class="block opacity-70">{{ user.email }}</span>
+                                <img v-if="user.avatarUrl" :src="user.avatarUrl" :alt="user.name"
+                                    class="h-9 w-9 rounded-full object-cover" />
+                                <span v-else
+                                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-xs font-bold text-zinc-700 dark:bg-neutral-800 dark:text-white">
+                                    {{ initials(user.name || user.email) }}
+                                </span>
+                                <span class="min-w-0">
+                                    <span class="block truncate font-medium">{{ user.name }}</span>
+                                    <span class="block truncate opacity-70">{{ user.email }}</span>
+                                </span>
                             </button>
                         </div>
 
@@ -205,14 +244,15 @@ const settingsError = ref("")
 const settingsMessage = ref("")
 const publicShareUrl = ref("")
 const userSearch = ref("")
-const userResults = ref<Array<{ id: number; name: string; email: string }>>([])
-const selectedUsers = ref<Array<{ id: number; name: string; email: string }>>([])
-const sharedUsers = ref<Array<{ id: number; name: string; email: string }>>([])
+const userResults = ref<Array<{ id: number; name: string; email: string; avatarUrl?: string | null }>>([])
+const selectedUsers = ref<Array<{ id: number; name: string; email: string; avatarUrl?: string | null }>>([])
+const sharedUsers = ref<Array<{ id: number; name: string; email: string; avatarUrl?: string | null }>>([])
 
 type FolderItem = {
     id: number;
     name: string;
     shared?: boolean;
+    iconUrl?: string | null;
 }
 
 const props = defineProps<{
@@ -233,6 +273,10 @@ const search = ref(props.modelValue ?? "");
 
 // Keep v-model in sync
 watch(search, (val: string) => emit("update:search", val));
+
+function initials(value = "") {
+    return value.trim().slice(0, 2).toUpperCase() || "??";
+}
 
 async function createFolder() {
     folderError.value = "";
@@ -282,7 +326,7 @@ async function loadFolderSettings() {
         const res = await $fetch<{
             folder: FolderItem;
             publicShares: Array<{ url: string }>;
-            sharedUsers: Array<{ id: number; name: string; email: string }>;
+            sharedUsers: Array<{ id: number; name: string; email: string; avatarUrl?: string | null }>;
         }>(`/api/folders/settings/${settingsFolder.value.id}`);
 
         settingsFolder.value = { ...settingsFolder.value, name: res.folder.name };
@@ -292,6 +336,60 @@ async function loadFolderSettings() {
         emit("folder-updated", settingsFolder.value);
     } catch (err: any) {
         settingsError.value = err?.data?.statusMessage || err?.statusMessage || "Could not load folder settings";
+    }
+}
+
+async function uploadFolderIcon(event: Event) {
+    if (!settingsFolder.value) {
+        return;
+    }
+
+    settingsError.value = "";
+    settingsMessage.value = "";
+
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+
+    if (!file) {
+        return;
+    }
+
+    try {
+        const form = new FormData();
+        form.append("icon", file);
+        const res = await $fetch<{ folder: FolderItem }>(`/api/folders/icon/${settingsFolder.value.id}`, {
+            method: "POST",
+            body: form
+        });
+
+        settingsFolder.value = { ...settingsFolder.value, ...res.folder };
+        settingsMessage.value = t('dashboard.folderIconUpdated');
+        emit("folder-updated", settingsFolder.value);
+    } catch (err: any) {
+        settingsError.value = err?.data?.statusMessage || err?.statusMessage || "Could not update folder icon";
+    } finally {
+        input.value = "";
+    }
+}
+
+async function removeFolderIcon() {
+    if (!settingsFolder.value) {
+        return;
+    }
+
+    settingsError.value = "";
+    settingsMessage.value = "";
+
+    try {
+        const res = await $fetch<{ folder: FolderItem }>(`/api/folders/icon/remove/${settingsFolder.value.id}`, {
+            method: "POST"
+        });
+
+        settingsFolder.value = { ...settingsFolder.value, ...res.folder };
+        settingsMessage.value = t('dashboard.folderIconRemoved');
+        emit("folder-updated", settingsFolder.value);
+    } catch (err: any) {
+        settingsError.value = err?.data?.statusMessage || err?.statusMessage || "Could not remove folder icon";
     }
 }
 
@@ -383,7 +481,7 @@ async function searchUsers() {
     }
 
     try {
-        const res = await $fetch<{ users: Array<{ id: number; name: string; email: string }> }>("/api/users/search", {
+        const res = await $fetch<{ users: Array<{ id: number; name: string; email: string; avatarUrl?: string | null }> }>("/api/users/search", {
             query: {
                 q: userSearch.value
             }
@@ -395,7 +493,7 @@ async function searchUsers() {
     }
 }
 
-function selectUser(user: { id: number; name: string; email: string }) {
+function selectUser(user: { id: number; name: string; email: string; avatarUrl?: string | null }) {
     if (
         !selectedUsers.value.some((selectedUser) => selectedUser.id === user.id)
         && !sharedUsers.value.some((sharedUser) => sharedUser.id === user.id)
@@ -422,7 +520,7 @@ async function shareWithSelectedUsers() {
     }
 
     try {
-        const res = await $fetch<{ users: Array<{ id: number; name: string; email: string }> }>(`/api/folders/share/user/${settingsFolder.value.id}`, {
+        const res = await $fetch<{ users: Array<{ id: number; name: string; email: string; avatarUrl?: string | null }> }>(`/api/folders/share/user/${settingsFolder.value.id}`, {
             method: "POST",
             body: {
                 userIds: selectedUsers.value.map((user) => user.id)

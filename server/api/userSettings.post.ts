@@ -47,7 +47,8 @@ export default defineEventHandler(async (event) => {
     return {
         settings: {
             colorMode: settings.colorMode,
-            searchVisible: settings.searchVisible !== "false"
+            searchVisible: settings.searchVisible !== "false",
+            avatarUrl: userAvatarUrl(user.id, settings.avatarPath)
         }
     };
 });

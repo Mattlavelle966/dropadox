@@ -35,7 +35,12 @@ export default defineEventHandler(async (event) => {
         .all();
 
     return {
-        folder,
+        folder: {
+            id: folder.id,
+            name: folder.name,
+            createdAt: folder.createdAt,
+            iconUrl: publicFolderIconUrl(share.token, folder.iconPath)
+        },
         uploads: folderUploads.map(upload => ({
             id: upload.id,
             folderId: upload.folderId,

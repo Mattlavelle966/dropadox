@@ -12,7 +12,7 @@
                 </NuxtLink>
             </div>
         </div>
-        <div>
+        <div class="flex items-center gap-2">
             <NuxtLink to="/signup" v-if="!isLoggedIn">
                 <Button variant="default" class="m-2 pointer-events-auto cursor-pointer shadow-md">
                     {{ t("common.nav.signup") }}
@@ -25,9 +25,18 @@
                 </Button>
             </NuxtLink>
             <NuxtLink to="/settings" v-if="isLoggedIn">
-                <Button variant="default" class="m-2 pointer-events-auto cursor-pointer shadow-md">
-                    {{ t("common.nav.settings") }}
-                </Button>
+                <div class="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-zinc-200 dark:hover:bg-neutral-800">
+                    <img v-if="showAvatar" :src="avatarUrl" :alt="session?.username"
+                        class="h-8 w-8 rounded-full object-cover" @error="showAvatar = false" />
+                    <div v-else
+                        class="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-xs font-bold text-zinc-700 dark:bg-neutral-800 dark:text-white">
+                        {{ userInitials }}
+                    </div>
+                    <div class="hidden text-left text-xs leading-tight md:block">
+                        <span class="block font-semibold">{{ session?.username }}</span>
+                        <span class="block max-w-40 truncate opacity-70">{{ session?.emailAddress }}</span>
+                    </div>
+                </div>
             </NuxtLink>
             <Button @click="logoff" variant="default"
                 class="m-2 border-black bg-red-500 hover:bg-red-400 text-white shadow-md hover:text-white pointer-events-auto cursor-pointer"
@@ -40,11 +49,20 @@
 </template>
 
 <script lang="ts" setup>
+import { onBeforeUnmount, onMounted, ref } from 'vue';
+
 const { t } = useI18n();
 const { data: session } = await useFetch("/api/verifyToken", {
     method: "POST"
 });
 const isLoggedIn = computed(() => Boolean(session.value));
+const avatarVersion = ref(Date.now());
+const showAvatar = ref(true);
+const avatarUrl = computed(() => session.value ? `/api/users/avatar/${session.value.id}?v=${avatarVersion.value}` : "");
+const userInitials = computed(() => {
+    const source = String(session.value?.username || session.value?.emailAddress || "?");
+    return source.slice(0, 2).toUpperCase();
+});
 const router = useRouter()
 async function logoff() {
     if (isLoggedIn.value) {
@@ -55,4 +73,17 @@ async function logoff() {
         await router.push('/')
     }
 }
+
+function refreshAvatar() {
+    showAvatar.value = true;
+    avatarVersion.value = Date.now();
+}
+
+onMounted(() => {
+    window.addEventListener("user-avatar-updated", refreshAvatar);
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener("user-avatar-updated", refreshAvatar);
+});
 </script>

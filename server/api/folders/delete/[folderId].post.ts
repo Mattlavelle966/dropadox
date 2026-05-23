@@ -40,6 +40,8 @@ export default defineEventHandler(async (event) => {
         }
     }
 
+    removeStoredImage(folder.iconPath);
+
     await db.delete(uploads)
         .where(eq(uploads.folderId, String(folderId)));
 

@@ -35,5 +35,5 @@ export default defineEventHandler(async (event) => {
         name: folderName
     }).returning().get();
 
-    return { folder };
+    return { folder: folderResponse(folder, false) };
 });

@@ -73,11 +73,11 @@ async function selectFolder(folderId: string | null) {
     });
 }
 
-function addFolder(folder: { id: number; name: string }) {
+function addFolder(folder: { id: number; name: string; iconUrl?: string | null }) {
     folders.value = [...folders.value, folder];
 }
 
-function updateFolder(folder: { id: number; name: string }) {
+function updateFolder(folder: { id: number; name: string; iconUrl?: string | null }) {
     folders.value = folders.value.map(existingFolder =>
         existingFolder.id === folder.id ? { ...existingFolder, ...folder } : existingFolder
     );

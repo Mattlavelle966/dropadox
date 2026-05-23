@@ -23,6 +23,7 @@ export const folders = sqliteTable("folders", {
     id: int("id").primaryKey({ autoIncrement: true }),
     userId: text("user_id").references(() => users.id),
     name: text("name").notNull(),
+    iconPath: text("icon_path"),
     createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
 })
 
@@ -48,4 +49,5 @@ export const userSettings = sqliteTable("userSettings", {
     userID: text("user_id").references(() => users.id),
     colorMode: text("color_mode").default('light'),
     searchVisible: text("search_visible").default('true'),
+    avatarPath: text("avatar_path"),
 })

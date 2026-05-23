@@ -13,6 +13,7 @@ export default defineEventHandler(async (event) => {
         id: folders.id,
         userId: folders.userId,
         name: folders.name,
+        iconPath: folders.iconPath,
         createdAt: folders.createdAt
     }).from(folderUserShares)
         .innerJoin(folders, eq(folderUserShares.folderId, folders.id))
@@ -21,8 +22,8 @@ export default defineEventHandler(async (event) => {
 
     return {
         folders: [
-            ...userFolders.map(folder => ({ ...folder, shared: false })),
-            ...sharedFolders.map(folder => ({ ...folder, shared: true }))
+            ...userFolders.map(folder => folderResponse(folder, false)),
+            ...sharedFolders.map(folder => folderResponse(folder, true))
         ]
     };
 });
