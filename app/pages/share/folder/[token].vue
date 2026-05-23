@@ -8,10 +8,20 @@
 
       <div class="flex flex-col gap-3">
         <div v-for="upload in uploads" :key="upload.id"
-          class="flex items-center justify-between rounded-md bg-white p-4 shadow-sm dark:bg-neutral-800 dark:text-white">
-          <div class="min-w-0">
+          class="flex items-center justify-between gap-4 rounded-md bg-white p-4 shadow-sm dark:bg-neutral-800 dark:text-white">
+          <div class="flex min-w-0 flex-1 items-center gap-3">
+            <img v-if="isImageFile(upload.fileName ?? '')" :src="publicPreviewUrl(upload)"
+              :alt="upload.fileName" class="h-12 w-12 rounded object-cover" loading="lazy" />
+            <video v-else-if="isVideoFile(upload.fileName ?? '')" :src="publicPreviewUrl(upload)"
+              class="h-20 w-32 rounded bg-black" controls />
+            <audio v-else-if="isAudioFile(upload.fileName ?? '')" :src="publicPreviewUrl(upload)" class="w-32" controls />
+            <iframe v-else-if="isPdfFile(upload.fileName ?? '')" :src="publicPreviewUrl(upload)" class="h-20 w-32 rounded border border-zinc-200 bg-white [color-scheme:light] dark:border-zinc-200" />
+            <iframe v-else-if="isHtmlPreviewFile(upload.fileName ?? '')" :src="publicPreviewUrl(upload)" class="h-20 w-32 rounded border border-zinc-200 bg-white [color-scheme:light] dark:border-zinc-200" sandbox />
+            <File v-else class="h-8 w-8 shrink-0" />
+            <div class="min-w-0">
             <p class="truncate font-medium">{{ upload.fileName }}</p>
             <p class="text-sm text-zinc-500 dark:text-zinc-400">{{ upload.size ?? 0 }} bytes</p>
+            </div>
           </div>
 
           <Button class="cursor-pointer" @click="download(upload)">
@@ -27,7 +37,8 @@
 </template>
 
 <script setup lang="ts">
-import { Download } from "lucide-vue-next";
+import { Download, File } from "lucide-vue-next";
+import { isAudioFile, isHtmlPreviewFile, isImageFile, isPdfFile, isVideoFile } from "~~/shared/utils/fileType";
 
 const route = useRoute();
 const token = String(route.params.token);
@@ -39,6 +50,10 @@ const data = await $fetch<{
 
 const folder = data.folder;
 const uploads = data.uploads;
+
+function publicPreviewUrl(upload: { id: number }) {
+  return `/api/public/preview/${token}/${upload.id}`;
+}
 
 async function download(upload: { id: number; fileName?: string }) {
   const res = await fetch(`/api/public/download/${token}/${upload.id}`);

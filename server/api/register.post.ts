@@ -8,12 +8,19 @@ export default defineEventHandler(async (event) => {
 
     const body = await readBody(event);
 
-    const { username, password, email } = body;
+    const { username, password, email, challengeToken } = body;
 
     if (!username || !email || !password) {
         throw createError({
             status: 400,
             statusText: "Username, email, and password are required."
+        })
+    }
+
+    if (!challengeToken || !verifySignupChallengeToken(String(challengeToken))) {
+        throw createError({
+            status: 400,
+            statusText: "Complete the signup challenge before creating an account."
         })
     }
 
@@ -51,6 +58,7 @@ export default defineEventHandler(async (event) => {
         email: email
     }).returning().get();
 
+    consumeSignupChallengeToken(String(challengeToken));
 
     await useDrizzle().insert(userSettings).values({
         userID: String(newUser.id),

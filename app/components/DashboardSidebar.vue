@@ -21,18 +21,21 @@
                     <span v-if="folder.shared" class="ml-1 text-xs opacity-60">{{ t('dashboard.shared') }}</span>
                 </Button>
 
-                <DropdownMenu v-if="!folder.shared">
+                <DropdownMenu>
                     <DropdownMenuTrigger as-child>
                         <Button variant="ghost" class="h-9 w-9 px-0 cursor-pointer hover:bg-zinc-400/30">
                             <MoreHorizontal class="w-4 h-4" />
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
-                        <DropdownMenuItem @click="openShareFolder(folder)">
+                        <DropdownMenuItem v-if="!folder.shared" @click="openShareFolder(folder)">
                             {{ t('dashboard.shareFolder') }}
                         </DropdownMenuItem>
-                        <DropdownMenuItem class="text-red-600 focus:text-red-600" @click="deleteFolder(folder)">
+                        <DropdownMenuItem v-if="!folder.shared" class="text-red-600 focus:text-red-600" @click="deleteFolder(folder)">
                             {{ t('dashboard.deleteFolder') }}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem v-if="folder.shared" class="text-red-600 focus:text-red-600" @click="leaveFolder(folder)">
+                            {{ t('dashboard.leaveSharedFolder') }}
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
@@ -325,6 +328,22 @@ async function deleteFolder(folder: FolderItem) {
         emit("folder-deleted", folder.id);
     } catch (err: any) {
         folderError.value = err?.data?.statusMessage || err?.statusMessage || "Could not delete folder";
+    }
+}
+
+async function leaveFolder(folder: FolderItem) {
+    if (!confirm(`Remove shared folder "${folder.name}" from your dashboard?`)) {
+        return;
+    }
+
+    try {
+        await $fetch(`/api/folders/leave/${folder.id}`, {
+            method: "POST"
+        });
+
+        emit("folder-deleted", folder.id);
+    } catch (err: any) {
+        folderError.value = err?.data?.statusMessage || err?.statusMessage || "Could not remove shared folder";
     }
 }
 </script>

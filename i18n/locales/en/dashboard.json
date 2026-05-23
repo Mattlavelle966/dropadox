@@ -10,6 +10,7 @@
         "folderName": "Folder name",
         "createFolder": "Create folder",
         "deleteFolder": "Delete folder",
+        "leaveSharedFolder": "Remove shared folder",
         "shareFolder": "Share folder",
         "shared": "(shared)",
         "createPublicLink": "Create public link",

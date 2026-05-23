@@ -1,9 +1,18 @@
 <template>
-    <div class="bg-neutral-200 dark:bg-neutral-900/60 hover:dark:bg-blue-500/30 p-4 rounded-xl hover:bg-neutral-300 transition-colors duration-200 cursor-pointer"
-        :key="fileId">
+    <div ref="fileCard"
+        class="relative bg-neutral-200 dark:bg-neutral-900/60 hover:dark:bg-blue-500/30 p-4 rounded-xl hover:bg-neutral-300 transition-colors duration-200 cursor-pointer"
+        :key="fileId" @mouseenter="openPreview" @mouseleave="scheduleHidePreview" @focusin="openPreview"
+        @focusout="scheduleHidePreview">
         <div class="flex justify-between dark:text-white/60" @click="openDetails">
             <div class="flex gap-4 items-center font-bold dark:text-white/80">
-                <File />
+                <img v-if="isImage" :src="previewUrl" :alt="props.fileName"
+                    class="h-10 w-10 rounded object-cover" loading="lazy" />
+                <FileVideo v-else-if="isVideo" />
+                <FileAudio v-else-if="isAudio" />
+                <FileSpreadsheet v-else-if="isSpreadsheet" />
+                <FileText v-else-if="isPdf" />
+                <FileText v-else-if="isDocument || isText" />
+                <File v-else />
                 {{ props.fileName }}
             </div>
 
@@ -24,22 +33,108 @@
                 </button>
             </div>
         </div>
+
+        <ClientOnly>
+            <Teleport to="body">
+                <div v-if="showPreview && canPreview" :style="previewStyle" @mouseenter="cancelHidePreview"
+                    @mouseleave="scheduleHidePreview"
+                    class="fixed z-[1000] overflow-hidden rounded-lg border border-zinc-300 bg-white text-zinc-950 shadow-2xl [color-scheme:light]">
+                    <img v-if="isImage" :src="previewUrl" :alt="props.fileName"
+                        class="max-h-72 w-full object-contain bg-white" loading="lazy" />
+                    <video v-else-if="isVideo" :src="previewUrl" class="max-h-72 w-full bg-black" muted
+                        preload="metadata" />
+                    <div v-else-if="isAudio" class="p-3">
+                        <audio :src="previewUrl" class="w-full" controls preload="metadata" />
+                    </div>
+                    <iframe v-else-if="isPdf" :src="previewUrl" class="h-72 w-full bg-white [color-scheme:light]" />
+                    <iframe v-else :src="previewUrl" class="h-72 w-full bg-white [color-scheme:light]" sandbox />
+                </div>
+            </Teleport>
+        </ClientOnly>
     </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { File, Download, Eye, Trash2 } from 'lucide-vue-next';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { File, FileAudio, FileSpreadsheet, FileText, FileVideo, Download, Eye, Trash2 } from 'lucide-vue-next';
+import { isAudioFile, isDocumentFile, isImageFile, isPdfFile, isPreviewableFile, isSpreadsheetFile, isTextFile, isVideoFile } from '~~/shared/utils/fileType';
 
 const props = defineProps<{ fileId: number; fileName: string; folderId?: string | null }>();
 const emit = defineEmits<{
     (e: 'deleted', fileId: number): void
 }>();
 const deleting = ref(false);
+const fileCard = ref<HTMLElement | null>(null);
+const showPreview = ref(false);
+const previewStyle = ref<Record<string, string>>({});
+let hidePreviewTimeout: ReturnType<typeof setTimeout> | null = null;
+const previewUrl = computed(() => `/api/preview/${props.fileId}`);
+const isImage = computed(() => isImageFile(props.fileName));
+const isVideo = computed(() => isVideoFile(props.fileName));
+const isAudio = computed(() => isAudioFile(props.fileName));
+const isPdf = computed(() => isPdfFile(props.fileName));
+const isDocument = computed(() => isDocumentFile(props.fileName));
+const isSpreadsheet = computed(() => isSpreadsheetFile(props.fileName));
+const isText = computed(() => isTextFile(props.fileName));
+const canPreview = computed(() => isPreviewableFile(props.fileName));
 const detailsLocation = computed(() => ({
     path: `/view/${props.fileId}`,
     query: props.folderId ? { folderId: props.folderId } : {}
 }));
+
+function updatePreviewPosition() {
+    if (!showPreview.value || !fileCard.value) {
+        return;
+    }
+
+    const padding = 16;
+    const previewHeight = 304;
+    const rowRect = fileCard.value.getBoundingClientRect();
+    const width = Math.min(448, window.innerWidth - padding * 2);
+    let left = Math.min(rowRect.left, window.innerWidth - width - padding);
+    let top = rowRect.bottom + 8;
+
+    if (top + previewHeight > window.innerHeight - padding) {
+        top = rowRect.top - previewHeight - 8;
+    }
+
+    if (top < padding) {
+        top = Math.max(padding, window.innerHeight - previewHeight - padding);
+    }
+
+    left = Math.max(padding, left);
+
+    previewStyle.value = {
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${width}px`
+    };
+}
+
+function cancelHidePreview() {
+    if (hidePreviewTimeout) {
+        clearTimeout(hidePreviewTimeout);
+        hidePreviewTimeout = null;
+    }
+}
+
+async function openPreview() {
+    if (!canPreview.value) {
+        return;
+    }
+
+    cancelHidePreview();
+    showPreview.value = true;
+    await nextTick();
+    updatePreviewPosition();
+}
+
+function scheduleHidePreview() {
+    cancelHidePreview();
+    hidePreviewTimeout = setTimeout(() => {
+        showPreview.value = false;
+    }, 120);
+}
 
 function openDetails() {
     navigateTo(detailsLocation.value);
@@ -106,5 +201,16 @@ async function deleteFile(event: MouseEvent) {
         deleting.value = false;
     }
 }
+
+onMounted(() => {
+    window.addEventListener("resize", updatePreviewPosition);
+    window.addEventListener("scroll", updatePreviewPosition, true);
+});
+
+onBeforeUnmount(() => {
+    cancelHidePreview();
+    window.removeEventListener("resize", updatePreviewPosition);
+    window.removeEventListener("scroll", updatePreviewPosition, true);
+});
 
 </script>
