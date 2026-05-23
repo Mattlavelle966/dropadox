@@ -3,17 +3,69 @@ import { eq, sql } from "drizzle-orm";
 import { users } from "../database/schema";
 import { userSettings } from "../database/schema";
 
+let registrationQueue = Promise.resolve();
+
+async function withRegistrationLock<T>(callback: () => Promise<T>) {
+    const previousRegistration = registrationQueue;
+    let releaseLock!: () => void;
+    registrationQueue = new Promise<void>((resolve) => {
+        releaseLock = resolve;
+    });
+
+    await previousRegistration;
+
+    try {
+        return await callback();
+    } finally {
+        releaseLock();
+    }
+}
+
+function isValidEmail(email: string) {
+    return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function isValidUsername(username: string) {
+    return username.length >= 3
+        && username.length <= 40
+        && /^[a-zA-Z0-9_.-]+$/.test(username);
+}
+
 export default defineEventHandler(async (event) => {
     enforceRateLimit(event, "register", 5, 60_000);
 
     const body = await readBody(event);
 
     const { username, password, email, challengeToken } = body;
+    const usernameValue = String(username ?? "").trim();
+    const emailAddress = String(email ?? "").trim().toLowerCase();
+    const passwordValue = String(password ?? "");
 
-    if (!username || !email || !password) {
+    if (!usernameValue || !emailAddress || !passwordValue) {
         throw createError({
             status: 400,
             statusText: "Username, email, and password are required."
+        })
+    }
+
+    if (!isValidUsername(usernameValue)) {
+        throw createError({
+            status: 400,
+            statusText: "Username must be 3-40 characters and only use letters, numbers, dots, underscores, or hyphens."
+        })
+    }
+
+    if (!isValidEmail(emailAddress)) {
+        throw createError({
+            status: 400,
+            statusText: "A valid email is required."
+        })
+    }
+
+    if (passwordValue.length < 8 || passwordValue.length > 200) {
+        throw createError({
+            status: 400,
+            statusText: "Password must be between 8 and 200 characters."
         })
     }
 
@@ -24,46 +76,48 @@ export default defineEventHandler(async (event) => {
         })
     }
 
-    const existingEmail = await useDrizzle()
-        .select()
-        .from(users)
-        .where(eq(users.email, email))
-        .get();
+    const hashedPassword = await bcrypt.hash(passwordValue, 10);
 
-    if (existingEmail) {
-        throw createError({
-            status: 409,
-            statusText: "An account with this email already exists."
-        })
-    }
+    const newUser = await withRegistrationLock(async () => {
+        const existingEmail = await useDrizzle()
+            .select()
+            .from(users)
+            .where(eq(users.email, emailAddress))
+            .get();
 
-    const existingUsername = await useDrizzle()
-        .select()
-        .from(users)
-        .where(eq(users.name, username))
-        .get();
+        if (existingEmail) {
+            throw createError({
+                status: 409,
+                statusText: "An account with this email already exists."
+            })
+        }
 
-    if (existingUsername) {
-        throw createError({
-            status: 409,
-            statusText: "This username is already taken."
-        })
-    }
+        const existingUsername = await useDrizzle()
+            .select()
+            .from(users)
+            .where(eq(users.name, usernameValue))
+            .get();
 
-    const userCount = await useDrizzle()
-        .select({ count: sql<number>`count(*)` })
-        .from(users)
-        .get();
-    const role = Number(userCount?.count ?? 0) === 0 ? "admin" : "user";
+        if (existingUsername) {
+            throw createError({
+                status: 409,
+                statusText: "This username is already taken."
+            })
+        }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+        const userCount = await useDrizzle()
+            .select({ count: sql<number>`count(*)` })
+            .from(users)
+            .get();
+        const role = Number(userCount?.count ?? 0) === 0 ? "admin" : "user";
 
-    const newUser = await useDrizzle().insert(users).values({
-        name: username,
-        password: hashedPassword,
-        email: email,
-        role
-    }).returning().get();
+        return await useDrizzle().insert(users).values({
+            name: usernameValue,
+            password: hashedPassword,
+            email: emailAddress,
+            role
+        }).returning().get();
+    });
 
     consumeSignupChallengeToken(String(challengeToken));
 

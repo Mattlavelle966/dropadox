@@ -5,7 +5,7 @@ export default defineEventHandler(async (event) => {
     const query = getQuery(event);
     const search = String(query.q ?? "").trim();
 
-    if (search.length < 2) {
+    if (search.length < 2 || search.length > 64 || search.replace(/[%_]/g, "").length < 2) {
         return { users: [] };
     }
 

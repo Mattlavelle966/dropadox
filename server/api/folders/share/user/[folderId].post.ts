@@ -11,7 +11,7 @@ export default defineEventHandler(async (event) => {
             ? [String(userId)]
             : [];
 
-    if (!Number.isInteger(folderId) || targetUserIds.length === 0) {
+    if (!Number.isInteger(folderId) || targetUserIds.length === 0 || targetUserIds.length > 25) {
         throw createError({ statusCode: 400, statusMessage: "Invalid share request" });
     }
 
@@ -30,6 +30,10 @@ export default defineEventHandler(async (event) => {
     const sharedUsers = [];
 
     for (const targetUserId of [...new Set(targetUserIds)]) {
+        if (!Number.isInteger(Number(targetUserId))) {
+            continue;
+        }
+
         if (targetUserId === canonicalOwnerId) {
             continue;
         }

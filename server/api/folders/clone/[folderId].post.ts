@@ -22,6 +22,10 @@ export default defineEventHandler(async (event) => {
     const requestedName = String(name ?? "").trim();
     let folderName = requestedName || `Copy of ${folderAccess.folder.name}`;
 
+    if (folderName.length > 80) {
+        throw createError({ statusCode: 400, statusMessage: "Folder name is too long" });
+    }
+
     for (let index = 2; ; index += 1) {
         const existingFolder = await db.select().from(folders)
             .where(and(

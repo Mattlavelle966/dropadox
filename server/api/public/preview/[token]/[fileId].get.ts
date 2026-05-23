@@ -13,6 +13,7 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 400, statusMessage: "Invalid preview link" });
     }
 
+    enforceRateLimit(event, `public-preview:${shareToken}`, 240, 60_000);
     const db = useDrizzle();
     const share = await getPublicFolderShare(db, shareToken);
 

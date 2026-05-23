@@ -9,7 +9,9 @@ function escapeHtml(value: string) {
 
 function safeHref(value: string) {
     const href = value.trim();
-    return href.startsWith("/") || href.startsWith("https://") || href.startsWith("http://")
+    return (href.startsWith("/") && !href.startsWith("//"))
+        || href.startsWith("https://")
+        || href.startsWith("http://")
         ? href
         : "#";
 }

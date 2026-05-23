@@ -9,7 +9,8 @@ export function getUploadDir() {
 }
 
 export function safeFileName(filename: string) {
-    return path.basename(filename).replace(/[^\w.\- ]+/g, "_");
+    const safeName = path.basename(filename).replace(/[^\w.\- ]+/g, "_").trim();
+    return (safeName || "upload.bin").slice(0, 180);
 }
 
 export function getStoredFileName(filePath: string) {

@@ -12,7 +12,13 @@ export function getAuthenticatedUserPayload(event: H3Event): UserPayload {
     }
 
     try {
-        return getUserPayload(token);
+        const payload = getUserPayload(token);
+
+        if (!Number.isInteger(Number(payload.id)) || !payload.username || !payload.emailAddress) {
+            throw new Error("Invalid auth payload");
+        }
+
+        return payload;
     } catch {
         throw createError({
             statusCode: 401,

@@ -1,5 +1,6 @@
 import { desc, eq, sql } from "drizzle-orm";
 import { folderPublishedShares, folders, userSettings, users } from "~~/server/database/schema";
+import { renderSafeMarkdown } from "~~/shared/utils/markdown";
 
 export default defineEventHandler(async () => {
     const db = useDrizzle();
@@ -13,7 +14,6 @@ export default defineEventHandler(async () => {
         folderIconPath: folders.iconPath,
         ownerId: users.id,
         ownerName: users.name,
-        ownerEmail: users.email,
         ownerAvatarPath: userSettings.avatarPath
     }).from(folderPublishedShares)
         .innerJoin(folders, eq(folderPublishedShares.folderId, folders.id))
@@ -27,7 +27,7 @@ export default defineEventHandler(async () => {
         folders: rows.map((row) => ({
             token: row.token,
             url: `/share/folder/${row.token}`,
-            markdown: row.markdown ?? "",
+            markdownHtml: renderSafeMarkdown(row.markdown ?? ""),
             likes: row.likes ?? 0,
             createdAt: row.createdAt,
             folder: {
@@ -38,7 +38,6 @@ export default defineEventHandler(async () => {
             owner: {
                 id: row.ownerId,
                 username: row.ownerName,
-                email: row.ownerEmail,
                 avatarUrl: row.ownerAvatarPath ? `/api/public/published-folders/avatar/${row.token}` : null
             }
         }))

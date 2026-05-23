@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
     const { userId } = await readBody(event);
     const targetUserId = String(userId ?? "");
 
-    if (!Number.isInteger(folderId) || !targetUserId) {
+    if (!Number.isInteger(folderId) || !Number.isInteger(Number(targetUserId))) {
         throw createError({ statusCode: 400, statusMessage: "Invalid share removal request" });
     }
 

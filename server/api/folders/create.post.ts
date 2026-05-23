@@ -14,6 +14,13 @@ export default defineEventHandler(async (event) => {
         });
     }
 
+    if (folderName.length > 80) {
+        throw createError({
+            statusCode: 400,
+            statusMessage: "Folder name is too long"
+        });
+    }
+
     const userPayload = getAuthenticatedUserPayload(event);
 
     const existingFolder = await useDrizzle().select().from(folders)

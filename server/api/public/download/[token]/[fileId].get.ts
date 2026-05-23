@@ -11,6 +11,7 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 400, statusMessage: "Invalid download link" });
     }
 
+    enforceRateLimit(event, `public-download:${shareToken}`, 120, 60_000);
     const db = useDrizzle();
     const share = await getPublicFolderShare(db, shareToken);
 

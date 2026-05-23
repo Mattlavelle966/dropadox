@@ -8,10 +8,16 @@ type Bucket = {
 const buckets = new Map<string, Bucket>();
 
 function getClientAddress(event: H3Event) {
-    const forwardedFor = getRequestHeader(event, "x-forwarded-for");
-    return forwardedFor?.split(",")[0]?.trim()
-        || event.node.req.socket.remoteAddress
-        || "unknown";
+    if (process.env.TRUST_PROXY === "true") {
+        const forwardedFor = getRequestHeader(event, "x-forwarded-for");
+        const forwardedAddress = forwardedFor?.split(",")[0]?.trim();
+
+        if (forwardedAddress) {
+            return forwardedAddress;
+        }
+    }
+
+    return event.node.req.socket.remoteAddress || "unknown";
 }
 
 export function enforceRateLimit(event: H3Event, key: string, limit: number, windowMs: number) {

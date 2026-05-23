@@ -81,13 +81,16 @@ export async function renderDocumentPreview(event: H3Event, filePath: string) {
         body = sanitizeHtml(result.value, {
             allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "h1", "h2", "table", "thead", "tbody", "tr", "th", "td"]),
             allowedAttributes: {
-                a: ["href", "name", "target"],
+                a: ["href", "name"],
                 img: ["src", "alt"],
                 table: ["colspan", "rowspan"],
                 th: ["colspan", "rowspan"],
                 td: ["colspan", "rowspan"]
             },
-            allowedSchemes: ["http", "https", "data", "mailto"]
+            allowedSchemes: ["http", "https", "mailto"],
+            allowedSchemesByTag: {
+                img: ["data"]
+            }
         });
     } else if (extension === "xlsx") {
         const rows = await readXlsxFile(filePath);

@@ -96,7 +96,7 @@ export function attemptSignupChallenge(challengeId: string, position: number) {
         purpose: "signup-challenge",
         challengeId,
         tokenId
-    }, process.env.JSON_SECRET_KEY!, { expiresIn: "10m" });
+    }, process.env.JSON_SECRET_KEY!, { algorithm: "HS256", expiresIn: "10m" });
 
     return {
         passed: true,
@@ -108,7 +108,9 @@ export function attemptSignupChallenge(challengeId: string, position: number) {
 export function verifySignupChallengeToken(token: string) {
     try {
         pruneChallenges();
-        const payload = jwt.verify(token, process.env.JSON_SECRET_KEY!) as { purpose?: string; tokenId?: string };
+        const payload = jwt.verify(token, process.env.JSON_SECRET_KEY!, {
+            algorithms: ["HS256"]
+        }) as { purpose?: string; tokenId?: string };
         return payload.purpose === "signup-challenge"
             && Boolean(payload.tokenId)
             && passedChallengeTokens.has(payload.tokenId!);
@@ -119,7 +121,9 @@ export function verifySignupChallengeToken(token: string) {
 
 export function consumeSignupChallengeToken(token: string) {
     try {
-        const payload = jwt.verify(token, process.env.JSON_SECRET_KEY!) as { tokenId?: string };
+        const payload = jwt.verify(token, process.env.JSON_SECRET_KEY!, {
+            algorithms: ["HS256"]
+        }) as { tokenId?: string };
         if (payload.tokenId) {
             passedChallengeTokens.delete(payload.tokenId);
         }

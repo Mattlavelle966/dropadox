@@ -38,7 +38,7 @@
             </div>
 
             <div class="published-markdown mt-3 line-clamp-5 text-sm text-zinc-700 dark:text-zinc-300"
-              v-html="renderSafeMarkdown(folder.markdown || t('index.noDescription'))"></div>
+              v-html="folder.markdownHtml || renderSafeMarkdown(t('index.noDescription'))"></div>
 
             <div class="published-card-footer mt-4 flex items-center justify-between gap-3">
               <NuxtLink :to="folder.url" class="text-sm font-medium text-blue-600 hover:text-blue-500">
@@ -71,10 +71,10 @@ const {t} = useI18n();
 type PublishedFolder = {
   token: string;
   url: string;
-  markdown: string;
+  markdownHtml: string;
   likes: number;
   folder: { id: number; name: string; iconUrl?: string | null };
-  owner: { id: number; username: string; email: string; avatarUrl?: string | null };
+  owner: { id: number; username: string; avatarUrl?: string | null };
 }
 
 const { data: publishedData } = await useFetch<{ folders: PublishedFolder[] }>("/api/public/published-folders");
