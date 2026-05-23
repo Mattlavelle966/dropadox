@@ -62,7 +62,8 @@ export default defineEventHandler(async (event) => {
 
     await useDrizzle().insert(userSettings).values({
         userID: String(newUser.id),
-        colorMode: "light"
+        colorMode: "light",
+        searchVisible: "true"
     }).returning().get();
 
 

@@ -17,18 +17,42 @@
           </p>
 
           <div class="flex items-center gap-4 dark:text-white/60">
-            <RadioGroup default-value="dark" class="flex flex-col gap-6">
+            <RadioGroup v-model="color" class="flex flex-col gap-6">
               
               <div class="flex items-center space-x-2">
-                <RadioGroupItem id="dark" v-model="color" value="dark" />
+                <RadioGroupItem id="dark" value="dark" />
                 <Label for="dark">{{ $t('settings.colorProfile.dark') }}</Label>
               </div>
 
               <div class="flex items-center space-x-2">
-                <RadioGroupItem id="light" v-model="color" value="light" />
+                <RadioGroupItem id="light" value="light" />
                 <Label for="light">{{ $t('settings.colorProfile.light') }}</Label>
               </div>
+
+              <div class="flex items-center space-x-2">
+                <RadioGroupItem id="system" value="system" />
+                <Label for="system">{{ $t('settings.colorProfile.system') }}</Label>
+              </div>
             </RadioGroup>
+          </div>
+        </div>
+
+        <div class="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
+          <div class="flex items-start gap-3">
+            <input
+              id="search-visible"
+              v-model="searchVisible"
+              type="checkbox"
+              class="mt-1 h-4 w-4"
+            />
+            <div>
+              <Label for="search-visible" class="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                {{ $t('settings.privacy.searchVisibleLabel') }}
+              </Label>
+              <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                {{ $t('settings.privacy.searchVisibleDescription') }}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -49,6 +73,20 @@ const { t } = useI18n()
 const updateError = ref("")
 
 const color = ref('light')
+const searchVisible = ref(true)
+
+const { data: settingsData, error: settingsError } = await useFetch<{
+  settings: { colorMode: string; searchVisible: boolean };
+}>("/api/userSettings");
+
+if (settingsError.value?.statusCode === 401) {
+  await navigateTo("/login");
+}
+
+if (settingsData.value?.settings) {
+  color.value = settingsData.value.settings.colorMode ?? "light";
+  searchVisible.value = settingsData.value.settings.searchVisible !== false;
+}
 
 async function updateSettings() {
   updateError.value = ""
@@ -56,7 +94,8 @@ async function updateSettings() {
     await $fetch('/api/userSettings', {
       method: 'POST',
       body: {
-        color_mode: color.value
+        color_mode: color.value,
+        search_visible: searchVisible.value
       }
     })
     await router.push('/dashboard')

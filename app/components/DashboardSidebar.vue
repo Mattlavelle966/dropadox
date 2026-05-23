@@ -28,8 +28,8 @@
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
-                        <DropdownMenuItem v-if="!folder.shared" @click="openShareFolder(folder)">
-                            {{ t('dashboard.shareFolder') }}
+                        <DropdownMenuItem v-if="!folder.shared" @click="openFolderSettings(folder)">
+                            {{ t('dashboard.folderSettings') }}
                         </DropdownMenuItem>
                         <DropdownMenuItem v-if="!folder.shared" class="text-red-600 focus:text-red-600" @click="deleteFolder(folder)">
                             {{ t('dashboard.deleteFolder') }}
@@ -98,15 +98,29 @@
             </DialogContent>
         </Dialog>
 
-        <Dialog v-model:open="showShareFolder">
+        <Dialog v-model:open="showFolderSettings">
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{{ t('dashboard.shareFolder') }}</DialogTitle>
+                    <DialogTitle>{{ t('dashboard.folderSettings') }}</DialogTitle>
                 </DialogHeader>
 
-                <div class="flex flex-col gap-4">
-                    <div class="flex flex-col gap-2">
-                        <Button class="cursor-pointer" @click="createPublicShare">
+                <div class="flex flex-col gap-5">
+                    <p v-if="settingsError" class="text-sm text-red-500">{{ settingsError }}</p>
+                    <p v-if="settingsMessage" class="text-sm text-green-600">{{ settingsMessage }}</p>
+
+                    <section class="flex flex-col gap-2">
+                        <h3 class="text-sm font-semibold">{{ t('dashboard.renameFolder') }}</h3>
+                        <div class="flex gap-2">
+                            <Input v-model="settingsFolderName" :placeholder="t('dashboard.folderName')" />
+                            <Button class="cursor-pointer" :disabled="!settingsFolderName.trim()" @click="renameFolder">
+                                {{ t('dashboard.saveFolderName') }}
+                            </Button>
+                        </div>
+                    </section>
+
+                    <section class="flex flex-col gap-2">
+                        <h3 class="text-sm font-semibold">{{ t('dashboard.publicAccess') }}</h3>
+                        <Button v-if="!publicShareUrl" class="cursor-pointer" @click="createPublicShare">
                             {{ t('dashboard.createPublicLink') }}
                         </Button>
                         <div v-if="publicShareUrl" class="flex gap-2">
@@ -115,11 +129,33 @@
                                 {{ t('dashboard.copyLink') }}
                             </Button>
                         </div>
-                    </div>
+                        <Button v-if="publicShareUrl" variant="ghost" class="cursor-pointer justify-start text-red-600 hover:text-red-600"
+                            @click="removePublicShare">
+                            {{ t('dashboard.removePublicLink') }}
+                        </Button>
+                    </section>
 
-                    <div class="flex flex-col gap-2">
+                    <section class="flex flex-col gap-2">
+                        <h3 class="text-sm font-semibold">{{ t('dashboard.peopleWithAccess') }}</h3>
+                        <div v-if="sharedUsers.length" class="flex flex-col gap-2">
+                            <div v-for="user in sharedUsers" :key="user.id"
+                                class="flex items-center justify-between gap-3 rounded-md border border-zinc-300 p-2 text-sm dark:border-neutral-700">
+                                <div class="min-w-0">
+                                    <span class="block truncate font-medium">{{ user.name }}</span>
+                                    <span class="block truncate opacity-70">{{ user.email }}</span>
+                                </div>
+                                <Button variant="ghost" class="h-8 cursor-pointer text-red-600 hover:text-red-600"
+                                    @click="removeSharedUser(user)">
+                                    {{ t('dashboard.removeUser') }}
+                                </Button>
+                            </div>
+                        </div>
+                        <p v-else class="text-sm text-zinc-500 dark:text-zinc-400">{{ t('dashboard.noSharedUsers') }}</p>
+                    </section>
+
+                    <section class="flex flex-col gap-2">
+                        <h3 class="text-sm font-semibold">{{ t('dashboard.addPeople') }}</h3>
                         <Input v-model="userSearch" :placeholder="t('dashboard.searchUsers')" @input="searchUsers" />
-                        <p v-if="shareError" class="text-sm text-red-500">{{ shareError }}</p>
 
                         <div v-if="selectedUsers.length" class="flex flex-wrap gap-2">
                             <button v-for="user in selectedUsers" :key="user.id"
@@ -143,8 +179,7 @@
                             {{ t('dashboard.shareSelectedUsers') }}
                         </Button>
 
-                        <p v-if="shareMessage" class="text-sm text-green-600">{{ shareMessage }}</p>
-                    </div>
+                    </section>
                 </div>
             </DialogContent>
         </Dialog>
@@ -161,16 +196,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 const { t } = useI18n();
 const showUploadFile = ref(false)
 const showCreateFolder = ref(false)
-const showShareFolder = ref(false)
+const showFolderSettings = ref(false)
 const folderName = ref("")
 const folderError = ref("")
-const sharingFolder = ref<FolderItem | null>(null)
+const settingsFolder = ref<FolderItem | null>(null)
+const settingsFolderName = ref("")
+const settingsError = ref("")
+const settingsMessage = ref("")
 const publicShareUrl = ref("")
 const userSearch = ref("")
 const userResults = ref<Array<{ id: number; name: string; email: string }>>([])
 const selectedUsers = ref<Array<{ id: number; name: string; email: string }>>([])
-const shareError = ref("")
-const shareMessage = ref("")
+const sharedUsers = ref<Array<{ id: number; name: string; email: string }>>([])
 
 type FolderItem = {
     id: number;
@@ -187,6 +224,7 @@ const emit = defineEmits<{
     (e: 'update:search', value: string): void;
     (e: 'select-folder', folderId: string | null): void;
     (e: 'folder-created', folder: FolderItem): void;
+    (e: 'folder-updated', folder: FolderItem): void;
     (e: 'folder-deleted', folderId: number): void;
     (e: 'uploaded'): void;
 }>();
@@ -216,33 +254,64 @@ async function createFolder() {
     }
 }
 
-function openShareFolder(folder: FolderItem) {
-    sharingFolder.value = folder;
+async function openFolderSettings(folder: FolderItem) {
+    settingsFolder.value = folder;
+    settingsFolderName.value = folder.name;
     publicShareUrl.value = "";
     userSearch.value = "";
     userResults.value = [];
     selectedUsers.value = [];
-    shareError.value = "";
-    shareMessage.value = "";
-    showShareFolder.value = true;
+    sharedUsers.value = [];
+    settingsError.value = "";
+    settingsMessage.value = "";
+    showFolderSettings.value = true;
+    await loadFolderSettings();
 }
 
-async function createPublicShare() {
-    if (!sharingFolder.value) {
+function firstPublicShareUrl(publicShares: Array<{ url: string }> = []) {
+    const share = publicShares[0];
+    return share ? `${window.location.origin}${share.url}` : "";
+}
+
+async function loadFolderSettings() {
+    if (!settingsFolder.value) {
         return;
     }
 
-    shareError.value = "";
-    shareMessage.value = "";
+    try {
+        const res = await $fetch<{
+            folder: FolderItem;
+            publicShares: Array<{ url: string }>;
+            sharedUsers: Array<{ id: number; name: string; email: string }>;
+        }>(`/api/folders/settings/${settingsFolder.value.id}`);
+
+        settingsFolder.value = { ...settingsFolder.value, name: res.folder.name };
+        settingsFolderName.value = res.folder.name;
+        publicShareUrl.value = firstPublicShareUrl(res.publicShares);
+        sharedUsers.value = res.sharedUsers;
+        emit("folder-updated", settingsFolder.value);
+    } catch (err: any) {
+        settingsError.value = err?.data?.statusMessage || err?.statusMessage || "Could not load folder settings";
+    }
+}
+
+async function createPublicShare() {
+    if (!settingsFolder.value) {
+        return;
+    }
+
+    settingsError.value = "";
+    settingsMessage.value = "";
 
     try {
-        const res = await $fetch<{ url: string }>(`/api/folders/share/public/${sharingFolder.value.id}`, {
+        const res = await $fetch<{ url: string }>(`/api/folders/share/public/${settingsFolder.value.id}`, {
             method: "POST"
         });
 
         publicShareUrl.value = `${window.location.origin}${res.url}`;
+        settingsMessage.value = t('dashboard.publicLinkCreated');
     } catch (err: any) {
-        shareError.value = err?.data?.statusMessage || err?.statusMessage || "Could not create share link";
+        settingsError.value = err?.data?.statusMessage || err?.statusMessage || "Could not create share link";
     }
 }
 
@@ -252,12 +321,61 @@ async function copyPublicShareUrl() {
     }
 
     await navigator.clipboard.writeText(publicShareUrl.value);
-    shareMessage.value = t('dashboard.linkCopied');
+    settingsMessage.value = t('dashboard.linkCopied');
+}
+
+async function removePublicShare() {
+    if (!settingsFolder.value) {
+        return;
+    }
+
+    if (!confirm(t('dashboard.confirmRemovePublicLink'))) {
+        return;
+    }
+
+    settingsError.value = "";
+    settingsMessage.value = "";
+
+    try {
+        await $fetch(`/api/folders/share/public/remove/${settingsFolder.value.id}`, {
+            method: "POST"
+        });
+
+        publicShareUrl.value = "";
+        settingsMessage.value = t('dashboard.publicLinkRemoved');
+    } catch (err: any) {
+        settingsError.value = err?.data?.statusMessage || err?.statusMessage || "Could not remove public link";
+    }
+}
+
+async function renameFolder() {
+    if (!settingsFolder.value) {
+        return;
+    }
+
+    settingsError.value = "";
+    settingsMessage.value = "";
+
+    try {
+        const res = await $fetch<{ folder: FolderItem }>(`/api/folders/rename/${settingsFolder.value.id}`, {
+            method: "POST",
+            body: {
+                name: settingsFolderName.value
+            }
+        });
+
+        settingsFolder.value = { ...settingsFolder.value, name: res.folder.name };
+        settingsFolderName.value = res.folder.name;
+        settingsMessage.value = t('dashboard.folderRenamed');
+        emit("folder-updated", settingsFolder.value);
+    } catch (err: any) {
+        settingsError.value = err?.data?.statusMessage || err?.statusMessage || "Could not rename folder";
+    }
 }
 
 async function searchUsers() {
-    shareError.value = "";
-    shareMessage.value = "";
+    settingsError.value = "";
+    settingsMessage.value = "";
 
     if (userSearch.value.trim().length < 2) {
         userResults.value = [];
@@ -273,12 +391,15 @@ async function searchUsers() {
 
         userResults.value = res.users;
     } catch (err: any) {
-        shareError.value = err?.data?.statusMessage || err?.statusMessage || "Could not search users";
+        settingsError.value = err?.data?.statusMessage || err?.statusMessage || "Could not search users";
     }
 }
 
 function selectUser(user: { id: number; name: string; email: string }) {
-    if (!selectedUsers.value.some((selectedUser) => selectedUser.id === user.id)) {
+    if (
+        !selectedUsers.value.some((selectedUser) => selectedUser.id === user.id)
+        && !sharedUsers.value.some((sharedUser) => sharedUser.id === user.id)
+    ) {
         selectedUsers.value = [...selectedUsers.value, user];
     }
 
@@ -291,27 +412,55 @@ function removeSelectedUser(userId: number) {
 }
 
 async function shareWithSelectedUsers() {
-    if (!sharingFolder.value) {
+    if (!settingsFolder.value) {
         return;
     }
 
     if (selectedUsers.value.length === 0) {
-        shareError.value = "Select at least one user";
+        settingsError.value = "Select at least one user";
         return;
     }
 
     try {
-        const res = await $fetch<{ users: Array<{ id: number; name: string; email: string }> }>(`/api/folders/share/user/${sharingFolder.value.id}`, {
+        const res = await $fetch<{ users: Array<{ id: number; name: string; email: string }> }>(`/api/folders/share/user/${settingsFolder.value.id}`, {
             method: "POST",
             body: {
                 userIds: selectedUsers.value.map((user) => user.id)
             }
         });
 
-        shareMessage.value = `${t('dashboard.sharedWith')} ${res.users.map((user) => user.email).join(", ")}`;
+        settingsMessage.value = `${t('dashboard.sharedWith')} ${res.users.map((user) => user.email).join(", ")}`;
         selectedUsers.value = [];
+        await loadFolderSettings();
     } catch (err: any) {
-        shareError.value = err?.data?.statusMessage || err?.statusMessage || "Could not share folder";
+        settingsError.value = err?.data?.statusMessage || err?.statusMessage || "Could not share folder";
+    }
+}
+
+async function removeSharedUser(user: { id: number; email: string }) {
+    if (!settingsFolder.value) {
+        return;
+    }
+
+    if (!confirm(t('dashboard.confirmRemoveUser', { email: user.email }))) {
+        return;
+    }
+
+    settingsError.value = "";
+    settingsMessage.value = "";
+
+    try {
+        await $fetch(`/api/folders/share/user/remove/${settingsFolder.value.id}`, {
+            method: "POST",
+            body: {
+                userId: user.id
+            }
+        });
+
+        sharedUsers.value = sharedUsers.value.filter((sharedUser) => sharedUser.id !== user.id);
+        settingsMessage.value = t('dashboard.userRemoved');
+    } catch (err: any) {
+        settingsError.value = err?.data?.statusMessage || err?.statusMessage || "Could not remove user";
     }
 }
 

@@ -2,7 +2,8 @@
     <div class="h-full">
         <div class="flex h-full grow bg-zinc-100 dark:bg-neutral-800/95">
             <DashboardSidebar :folders="folders" :selected-folder-id="selectedFolderId"
-                @select-folder="selectFolder" @folder-created="addFolder" @folder-deleted="removeFolder">
+                @select-folder="selectFolder" @folder-created="addFolder" @folder-updated="updateFolder"
+                @folder-deleted="removeFolder">
                 <div class="p-4 bg-white dark:bg-neutral-900/60 rounded-lg shadow-md flex flex-col gap-4 dark:text-white/80">
                     <h1 class="text-2xl font-bold mb-4">{{t("view.fileDetails.title")}}</h1>
                     <img v-if="isImage" :src="previewUrl" :alt="upload.fileName"
@@ -74,6 +75,12 @@ async function selectFolder(folderId: string | null) {
 
 function addFolder(folder: { id: number; name: string }) {
     folders.value = [...folders.value, folder];
+}
+
+function updateFolder(folder: { id: number; name: string }) {
+    folders.value = folders.value.map(existingFolder =>
+        existingFolder.id === folder.id ? { ...existingFolder, ...folder } : existingFolder
+    );
 }
 
 function removeFolder(folderId: number) {

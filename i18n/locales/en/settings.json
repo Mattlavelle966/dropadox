@@ -7,6 +7,10 @@
             "dark": "Dark",
             "system": "System Default"
         },
+        "privacy": {
+            "searchVisibleLabel": "Show me in user search",
+            "searchVisibleDescription": "Turn this off to make your account private. Other users will not find you when sharing folders by search."
+        },
         "updateButton": "Update Settings",
         "errorUpdating": "An error occurred while updating settings. Please try again."
     }

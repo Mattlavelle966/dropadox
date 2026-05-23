@@ -1,4 +1,4 @@
-import { like, ne, and, or } from "drizzle-orm";
+import { like, ne, and, or, sql } from "drizzle-orm";
 import { users } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
@@ -21,7 +21,12 @@ export default defineEventHandler(async (event) => {
                 like(users.email, `%${search}%`),
                 like(users.name, `%${search}%`)
             ),
-            ne(users.id, Number(userPayload.id))
+            ne(users.id, Number(userPayload.id)),
+            sql`not exists (
+                select 1 from userSettings
+                where userSettings.user_id = cast(${users.id} as text)
+                and userSettings.search_visible = 'false'
+            )`
         ))
         .limit(10)
         .all();

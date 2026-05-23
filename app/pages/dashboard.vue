@@ -3,7 +3,8 @@
     <div class="flex h-full grow bg-zinc-100 dark:bg-neutral-800/95">
 
       <DashboardSidebar v-model:search="searchQuery" :folders="folders" :selected-folder-id="selectedFolderId"
-        @select-folder="selectFolder" @folder-created="addFolder" @folder-deleted="removeFolder" @uploaded="refreshUploads">
+        @select-folder="selectFolder" @folder-created="addFolder" @folder-updated="updateFolder"
+        @folder-deleted="removeFolder" @uploaded="refreshUploads">
         <FileCard v-for="fileUpload in filteredUploads" :key="fileUpload.id" :file-id="fileUpload.id"
           :file-name="fileUpload.fileName ?? ''" :folder-id="selectedFolderId" @deleted="removeUpload" />
       </DashboardSidebar>
@@ -77,6 +78,12 @@ async function selectFolder(folderId: string | null) {
 
 function addFolder(folder: { id: number; name: string }) {
   folders.value = [...folders.value, folder];
+}
+
+function updateFolder(folder: { id: number; name: string }) {
+  folders.value = folders.value.map(existingFolder =>
+    existingFolder.id === folder.id ? { ...existingFolder, ...folder } : existingFolder
+  );
 }
 
 async function removeFolder(folderId: number) {

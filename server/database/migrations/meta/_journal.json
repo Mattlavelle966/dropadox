@@ -29,6 +29,13 @@
       "when": 1779464100000,
       "tag": "0003_public_share_expiry",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1779496000000,
+      "tag": "0004_user_search_visibility",
+      "breakpoints": true
     }
   ]
 }

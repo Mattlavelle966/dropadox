@@ -47,4 +47,5 @@ export const userSettings = sqliteTable("userSettings", {
     id: int("id").primaryKey({ autoIncrement: true }),
     userID: text("user_id").references(() => users.id),
     colorMode: text("color_mode").default('light'),
+    searchVisible: text("search_visible").default('true'),
 })
