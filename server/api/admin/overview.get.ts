@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { folderPublishedShares, folders, uploads, userSettings, users } from "~~/server/database/schema";
+import { folderPublishedShares, folders, ipBlacklist, uploads, userSettings, users } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
     await requireAdmin(event);
@@ -44,6 +44,9 @@ export default defineEventHandler(async (event) => {
     const rootFileCount = await db.select({ count: sql<number>`count(*)` }).from(uploads)
         .where(sql`${uploads.folderId} is null`)
         .get();
+    const blacklistedIpRows = await db.select().from(ipBlacklist)
+        .orderBy(ipBlacklist.id)
+        .all();
 
     return {
         users: userRows.map((user) => ({
@@ -67,10 +70,17 @@ export default defineEventHandler(async (event) => {
             published: Boolean(folder.publishedToken),
             likes: folder.publishedLikes ?? 0
         })),
+        blacklistedIps: blacklistedIpRows.map((row) => ({
+            id: row.id,
+            ipAddress: row.ipAddress,
+            reason: row.reason,
+            createdAt: row.createdAt
+        })),
         totals: {
             users: userRows.length,
             folders: folderRows.length,
-            rootFiles: Number(rootFileCount?.count ?? 0)
+            rootFiles: Number(rootFileCount?.count ?? 0),
+            blacklistedIps: blacklistedIpRows.length
         }
     };
 });

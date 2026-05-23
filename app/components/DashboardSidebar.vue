@@ -1,50 +1,47 @@
 <template>
-    <aside class="w-64 bg-zinc-300 dark:bg-neutral-900 dark:text-white flex flex-col p-4 space-y-6">
-        <nav class="flex flex-col space-y-2">
-            <Button variant="ghost" 
-            class="justify-start hover:bg-zinc-400/30 cursor-pointer" 
-            @click="emit('select-folder', null)"
-            :class="{ 'bg-zinc-400/30': props.selectedFolderId === null }">
-        
+    <aside class="w-72 shrink-0 bg-zinc-300 dark:bg-neutral-900 dark:text-white flex flex-col p-4 space-y-6">
+        <div class="flex flex-col gap-2">
+            <Input v-model="search" :placeholder="t('dashboard.searchFiles')"
+                class="border-zinc-300 bg-white dark:bg-neutral-800 dark:focus-visible:ring-neutral-300 focus-visible:ring-zinc-300" />
+
+            <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                    <Button class="w-full cursor-pointer justify-between" variant="default">{{ t('common.words.new') }}
+                        <ChevronDown class="h-4 w-4" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                    <DropdownMenuItem @click="showUploadFile = true">{{ t('dashboard.uploadFile') }}</DropdownMenuItem>
+                    <DropdownMenuItem @click="showCreateFolder = true">{{ t('dashboard.newFolder') }}</DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
+
+        <nav class="flex flex-col gap-2">
+            <Button variant="ghost" class="justify-start hover:bg-zinc-400/30 cursor-pointer"
+                @click="emit('select-folder', null)"
+                :class="{ 'bg-zinc-400/30': props.selectedFolderId === null }">
                 <Folder class="w-4 h-4 mr-2" />
                 {{ t('dashboard.myFiles') }}
             </Button>
-
-            <div v-for="folder in props.folders" :key="folder.id"
-                class="flex items-center rounded-md hover:bg-zinc-400/30"
-                :class="{ 'bg-zinc-400/30': props.selectedFolderId === String(folder.id) }">
-                <Button variant="ghost"
-                    class="min-w-0 flex-1 justify-start cursor-pointer hover:bg-transparent"
-                    @click="emit('select-folder', String(folder.id))">
-                    <img v-if="folder.iconUrl" :src="folder.iconUrl" :alt="folder.name"
-                        class="mr-2 h-5 w-5 rounded object-cover" />
-                    <Folder v-else class="w-4 h-4 mr-2" />
-                    <span class="truncate">{{ folder.name }}</span>
-                    <span v-if="folder.shared" class="ml-1 text-xs opacity-60">{{ t('dashboard.shared') }}</span>
+            <NuxtLink to="/settings">
+                <Button variant="ghost" class="w-full justify-start hover:bg-zinc-400/30 cursor-pointer">
+                    <Settings class="w-4 h-4 mr-2" />
+                    {{ t('common.nav.settings') }}
                 </Button>
-
-                <DropdownMenu>
-                    <DropdownMenuTrigger as-child>
-                        <Button variant="ghost" class="h-9 w-9 px-0 cursor-pointer hover:bg-zinc-400/30">
-                            <MoreHorizontal class="w-4 h-4" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                        <DropdownMenuItem v-if="folder.canManage" @click="openFolderSettings(folder)">
-                            {{ t('dashboard.folderSettings') }}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem @click="cloneFolder(folder)">
-                            {{ t('dashboard.cloneFolder') }}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem v-if="folder.canManage" class="text-red-600 focus:text-red-600" @click="deleteFolder(folder)">
-                            {{ t('dashboard.deleteFolder') }}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem v-if="folder.shared" class="text-red-600 focus:text-red-600" @click="leaveFolder(folder)">
-                            {{ t('dashboard.leaveSharedFolder') }}
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
+            </NuxtLink>
+            <NuxtLink v-if="isAdmin" to="/admin">
+                <Button variant="ghost" class="w-full justify-start hover:bg-zinc-400/30 cursor-pointer">
+                    <Shield class="w-4 h-4 mr-2" />
+                    {{ t('common.nav.admin') }}
+                </Button>
+            </NuxtLink>
+            <Button v-if="isLoggedIn" variant="ghost"
+                class="justify-start text-red-600 hover:bg-red-500/10 hover:text-red-600 cursor-pointer"
+                @click="logoff">
+                <LogOut class="w-4 h-4 mr-2" />
+                {{ t('common.nav.logOut') }}
+            </Button>
         </nav>
 
         <div class="mt-auto text-sm text-black/80 dark:text-white/50">
@@ -53,28 +50,9 @@
     </aside>
 
     <div class="flex-1 flex flex-col w-full">
-
-        <header class="p-4 border-b dark:border-b-neutral-800 flex items-center gap-4">
-            <div class="flex-1">
-                <Input v-model="search" :placeholder="t('dashboard.searchFiles')"
-                    class="text-zinc-300 border-zinc-300 bg-white dark:bg-neutral-800 dark:focus-visible:ring-neutral-300 focus-visible:ring-zinc-300" />
-            </div>
-
-            <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                    <Button class="cursor-pointer" variant="default">{{ t('common.words.new') }}
-                        <ChevronDown />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                    <DropdownMenuItem @click="showUploadFile = true">{{ t('dashboard.uploadFile') }}</DropdownMenuItem>
-                    <DropdownMenuItem @click="showCreateFolder = true">{{ t('dashboard.newFolder') }}</DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
-        </header>
-
         <main class="flex flex-col w-full gap-4 p-4 overflow-y-auto">
-            <slot />
+            <slot :open-folder-settings="openFolderSettings" :delete-folder="deleteFolder" :clone-folder="cloneFolder"
+                :leave-folder="leaveFolder" />
         </main>
 
         <Dialog v-model:open="showUploadFile">
@@ -273,12 +251,18 @@
 
 <script lang="ts" setup>
 import { ref, watch } from 'vue';
-import { Folder, ChevronDown, MoreHorizontal, X } from "lucide-vue-next";
+import { Folder, ChevronDown, X, Settings, Shield, LogOut } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 const { t } = useI18n();
+const router = useRouter();
+const { data: session } = await useFetch("/api/verifyToken", {
+    method: "POST"
+});
+const isLoggedIn = computed(() => Boolean(session.value));
+const isAdmin = computed(() => session.value?.role === "admin");
 const showUploadFile = ref(false)
 const showCreateFolder = ref(false)
 const showFolderSettings = ref(false)
@@ -307,7 +291,7 @@ type FolderItem = {
 }
 
 const props = defineProps<{
-    modelValue?: string;
+    search?: string;
     folders?: FolderItem[];
     selectedFolderId?: string | null;
 }>();
@@ -320,10 +304,15 @@ const emit = defineEmits<{
     (e: 'uploaded'): void;
 }>();
 
-const search = ref(props.modelValue ?? "");
+const search = ref(props.search ?? "");
 
 // Keep v-model in sync
 watch(search, (val: string) => emit("update:search", val));
+watch(() => props.search, (val) => {
+    if (val !== undefined && val !== search.value) {
+        search.value = val;
+    }
+});
 
 function initials(value = "") {
     return value.trim().slice(0, 2).toUpperCase() || "??";
@@ -336,7 +325,8 @@ async function createFolder() {
         const res = await $fetch<{ folder: { id: number; name: string } }>("/api/folders/create", {
             method: "POST",
             body: {
-                name: folderName.value
+                name: folderName.value,
+                parentId: props.selectedFolderId
             }
         });
 
@@ -347,6 +337,18 @@ async function createFolder() {
     } catch (err: any) {
         folderError.value = err?.data?.statusMessage || err?.statusMessage || "Could not create folder";
     }
+}
+
+async function logoff() {
+    if (!isLoggedIn.value) {
+        return;
+    }
+
+    await $fetch("/api/logout", {
+        method: "POST"
+    });
+    session.value = null;
+    await router.push("/");
 }
 
 async function openFolderSettings(folder: FolderItem) {

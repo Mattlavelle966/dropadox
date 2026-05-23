@@ -182,9 +182,10 @@ export default defineEventHandler(async (event) => {
             });
         }
 
+        const folderAccess = folderId ? await getFolderAccess(db, folderId, userId) : null;
         const upload = await db.insert(uploads)
             .values({
-                userId,
+                userId: folderAccess ? String(folderAccess.folder.userId) : userId,
                 folderId,
                 filePath: parsed.uploadPath,
                 privacyFlag: "private",

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { folders } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
@@ -32,7 +32,8 @@ export default defineEventHandler(async (event) => {
     const existingFolder = await db.select().from(folders)
         .where(and(
             eq(folders.userId, String(folderAccess.folder.userId)),
-            eq(folders.name, folderName)
+            eq(folders.name, folderName),
+            folderAccess.folder.parentId ? eq(folders.parentId, String(folderAccess.folder.parentId)) : isNull(folders.parentId)
         ))
         .get();
 

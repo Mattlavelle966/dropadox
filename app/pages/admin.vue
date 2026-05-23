@@ -13,6 +13,27 @@
       </header>
 
       <section class="flex flex-col gap-3">
+        <h2 class="text-lg font-semibold">{{ t("admin.blacklistedIps") }}</h2>
+        <div class="overflow-hidden rounded-lg border border-zinc-300 bg-white dark:border-neutral-700 dark:bg-neutral-950">
+          <div v-if="blacklistedIps.length === 0" class="p-3 text-sm text-zinc-500 dark:text-zinc-400">
+            {{ t("admin.noBlacklistedIps") }}
+          </div>
+          <div v-for="ip in blacklistedIps" :key="ip.id"
+            class="flex items-center justify-between gap-4 border-b border-zinc-200 p-3 last:border-b-0 dark:border-neutral-800">
+            <div class="min-w-0">
+              <p class="truncate font-medium">{{ ip.ipAddress }}</p>
+              <p class="truncate text-sm text-zinc-500 dark:text-zinc-400">
+                {{ ip.reason }} · {{ ip.createdAt }}
+              </p>
+            </div>
+            <Button variant="ghost" class="cursor-pointer text-red-600 hover:text-red-600" @click="deleteBlacklistedIp(ip)">
+              {{ t("admin.removeIp") }}
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section class="flex flex-col gap-3">
         <h2 class="text-lg font-semibold">{{ t("admin.users") }}</h2>
         <div class="overflow-hidden rounded-lg border border-zinc-300 bg-white dark:border-neutral-700 dark:bg-neutral-950">
           <div v-for="user in users" :key="user.id"
@@ -97,10 +118,18 @@ type AdminFolder = {
   likes: number;
 }
 
+type BlacklistedIp = {
+  id: number;
+  ipAddress: string;
+  reason: string;
+  createdAt: string;
+}
+
 const { data, error, refresh } = await useFetch<{
   users: AdminUser[];
   folders: AdminFolder[];
-  totals: { users: number; folders: number; rootFiles: number };
+  blacklistedIps: BlacklistedIp[];
+  totals: { users: number; folders: number; rootFiles: number; blacklistedIps: number };
 }>("/api/admin/overview");
 
 if (error.value?.statusCode === 401) {
@@ -113,7 +142,8 @@ if (error.value?.statusCode === 403) {
 
 const users = computed(() => data.value?.users ?? []);
 const folders = computed(() => data.value?.folders ?? []);
-const totals = computed(() => data.value?.totals ?? { users: 0, folders: 0, rootFiles: 0 });
+const blacklistedIps = computed(() => data.value?.blacklistedIps ?? []);
+const totals = computed(() => data.value?.totals ?? { users: 0, folders: 0, rootFiles: 0, blacklistedIps: 0 });
 
 function initials(value = "") {
   return value.trim().slice(0, 2).toUpperCase() || "??";
@@ -136,6 +166,17 @@ async function deleteFolder(folder: AdminFolder) {
   }
 
   await $fetch(`/api/admin/folders/delete/${folder.id}`, {
+    method: "POST"
+  });
+  await refresh();
+}
+
+async function deleteBlacklistedIp(ip: BlacklistedIp) {
+  if (!confirm(t("admin.confirmDeleteIp", { ip: ip.ipAddress }))) {
+    return;
+  }
+
+  await $fetch(`/api/admin/blacklist/delete/${ip.id}`, {
     method: "POST"
   });
   await refresh();

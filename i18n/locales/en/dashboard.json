@@ -2,6 +2,8 @@
     "dashboard": {
         "title": "Dashboard",
         "myFiles": "My Files",
+        "upFolder": "Up one folder",
+        "emptyFolder": "This folder is empty.",
         "starred": "Starred",
         "trash": "Trash",
         "searchFiles": "Search files...",

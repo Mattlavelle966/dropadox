@@ -9,5 +9,11 @@ export default defineEventHandler(async (event) => {
         });
     }
 
-    return attemptSignupChallenge(String(challengeId), numericPosition);
+    const result = attemptSignupChallenge(String(challengeId), numericPosition);
+
+    if (!result.passed && result.attemptsLeft <= 0) {
+        await blacklistClientAddress(event, "captcha_failed");
+    }
+
+    return result;
 });
