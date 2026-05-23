@@ -57,8 +57,17 @@
         "shareSelectedUsers": "Share with selected users",
         "sharedWith": "Shared with",
         "uploadFileModalTitle": "Upload a file",
-        "uploadFileModalDescription": "Select a file from your computer",
+        "uploadFileModalDescription": "Drop files here or click to choose files",
         "uploadFileModalButton": "Upload",
-        "uploadFileSuccessMessage": "File: '{fileName}' uploaded successfully!"
+        "uploadFileSuccessMessage": "File: '{fileName}' uploaded successfully!",
+        "uploadFilesSelected": "{count} file(s) selected",
+        "uploadDropHint": "You can add more files before starting the upload.",
+        "uploadingFiles": "Uploading {count} file(s) ({progress}%)",
+        "uploadFilesSuccessMessage": "{count} file(s) uploaded successfully.",
+        "uploadFilesFailedMessage": "{count} file(s) failed. Failed files can be retried.",
+        "uploadQueued": "Queued",
+        "uploadDone": "Done",
+        "uploadFailed": "Failed",
+        "clearSelection": "Clear"
     }
 }

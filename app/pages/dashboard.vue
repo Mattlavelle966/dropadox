@@ -13,12 +13,21 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onBeforeUnmount, onMounted } from 'vue';
 import DashboardSidebar from "@/components/DashboardSidebar.vue"; // make sure to import it
 
 const {t} = useI18n();
 const route = useRoute();
 const initialFolderId = typeof route.query.folderId === "string" ? route.query.folderId : null;
+
+type FolderItem = {
+  id: number;
+  name: string;
+  shared?: boolean;
+  accessRole?: string;
+  canManage?: boolean;
+  iconUrl?: string | null;
+}
 
 const { data, error: uploadsError } = await useFetch("/api/files/fromUser", {
   method: "POST",
@@ -40,8 +49,10 @@ if (foldersError.value?.statusCode === 401) {
 }
 
 const userUploads = ref(data.value?.userUploads ?? []);
-const folders = ref(folderData.value?.folders ?? []);
+const folders = ref<FolderItem[]>(folderData.value?.folders ?? []);
 const selectedFolderId = ref<string | null>(initialFolderId);
+const refreshingDashboard = ref(false);
+let dashboardRefreshTimer: number | undefined;
 
 const searchQuery = ref("");
 
@@ -67,6 +78,38 @@ async function refreshUploads() {
   userUploads.value = data.userUploads;
 }
 
+async function refreshFolders() {
+  const data = await $fetch<{ folders: FolderItem[] }>("/api/folders/list", {
+    method: "POST"
+  });
+
+  folders.value = data.folders;
+
+  if (selectedFolderId.value && !data.folders.some(folder => String(folder.id) === selectedFolderId.value)) {
+    selectedFolderId.value = null;
+    await navigateTo({
+      path: "/dashboard",
+      query: {}
+    }, { replace: true });
+  }
+}
+
+async function refreshDashboard() {
+  if (refreshingDashboard.value) {
+    return;
+  }
+
+  try {
+    refreshingDashboard.value = true;
+    await refreshFolders();
+    await refreshUploads();
+  } catch (error) {
+    // A stale auth cookie or transient request failure should not break the open dashboard.
+  } finally {
+    refreshingDashboard.value = false;
+  }
+}
+
 async function selectFolder(folderId: string | null) {
   selectedFolderId.value = folderId;
   await navigateTo({
@@ -76,11 +119,11 @@ async function selectFolder(folderId: string | null) {
   await refreshUploads();
 }
 
-function addFolder(folder: { id: number; name: string; iconUrl?: string | null }) {
+function addFolder(folder: FolderItem) {
   folders.value = [...folders.value, folder];
 }
 
-function updateFolder(folder: { id: number; name: string; iconUrl?: string | null }) {
+function updateFolder(folder: FolderItem) {
   folders.value = folders.value.map(existingFolder =>
     existingFolder.id === folder.id ? { ...existingFolder, ...folder } : existingFolder
   );
@@ -94,6 +137,32 @@ async function removeFolder(folderId: number) {
     await refreshUploads();
   }
 }
+
+function onVisibilityChange() {
+  if (document.visibilityState === "visible") {
+    refreshDashboard();
+  }
+}
+
+onMounted(() => {
+  dashboardRefreshTimer = window.setInterval(() => {
+    if (document.visibilityState === "visible") {
+      refreshDashboard();
+    }
+  }, 5000);
+
+  window.addEventListener("focus", refreshDashboard);
+  document.addEventListener("visibilitychange", onVisibilityChange);
+});
+
+onBeforeUnmount(() => {
+  if (dashboardRefreshTimer) {
+    window.clearInterval(dashboardRefreshTimer);
+  }
+
+  window.removeEventListener("focus", refreshDashboard);
+  document.removeEventListener("visibilitychange", onVisibilityChange);
+});
 
 useHead({
   title: t("common.siteName") + " - " + t("dashboard.title")
