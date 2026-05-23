@@ -1,15 +1,20 @@
 export default defineEventHandler(async (event) => {
-    const payload = getAuthenticatedUserPayload(event);
+    let payload;
+
+    try {
+        payload = getAuthenticatedUserPayload(event);
+    } catch {
+        return { authenticated: false };
+    }
+
     const user = await getUserFromPayload(payload);
 
     if (!user) {
-        throw createError({
-            statusCode: 401,
-            statusMessage: "Invalid session"
-        });
+        return { authenticated: false };
     }
 
     return {
+        authenticated: true,
         username: user.name,
         emailAddress: user.email,
         id: user.id,

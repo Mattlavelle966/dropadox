@@ -4,8 +4,7 @@ import path from "path";
 import { uploads } from "../database/schema";
 import { getUserStorageBytes } from "../database/userStorage";
 import { getUploadDir, safeFileName } from "../utils/fileStorage";
-
-const DEFAULT_MAX_BYTES = 10_000_000_000;
+import { getMaxUserStorageBytes } from "../utils/storageQuota";
 
 type ParsedUpload = {
     filename?: string;
@@ -19,13 +18,6 @@ function removeFileIfExists(filePath?: string) {
     if (filePath && fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
     }
-}
-
-function getMaxBytes() {
-    const configuredMaxBytes = Number(process.env.MAX_USER_STORAGE_BYTES);
-    return Number.isFinite(configuredMaxBytes) && configuredMaxBytes > 0
-        ? configuredMaxBytes
-        : DEFAULT_MAX_BYTES;
 }
 
 async function parseUpload(event: any, maxBytes: number, limitStatus = "FILE_TOO_LARGE"): Promise<ParsedUpload> {
@@ -115,7 +107,7 @@ export default defineEventHandler(async (event) => {
     try {
         enforceRateLimit(event, "upload", 20, 60_000);
         const userPayload = getAuthenticatedUserPayload(event);
-        const maxBytes = getMaxBytes();
+        const maxBytes = getMaxUserStorageBytes();
         const usedBytes = await getUserStorageBytes(String(userPayload.id));
         const remainingBytes = maxBytes - usedBytes;
 

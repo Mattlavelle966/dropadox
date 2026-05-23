@@ -29,52 +29,148 @@
             </Button>
           </header>
 
-          <section class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
-            <div v-for="folder in filteredVisibleFolders" :key="folder.id"
-              class="group flex min-h-32 flex-col justify-between rounded-md border border-zinc-300 bg-white p-3 shadow-sm transition hover:border-zinc-400 dark:border-neutral-700 dark:bg-neutral-950 dark:hover:border-neutral-500">
-              <button class="flex min-w-0 flex-1 flex-col items-start gap-3 text-left" @click="selectFolder(String(folder.id))">
-                <img v-if="folder.iconUrl" :src="folder.iconUrl" :alt="folder.name"
-                  class="h-12 w-12 rounded-md object-cover" />
-                <span v-else class="flex h-12 w-12 items-center justify-center rounded-md bg-zinc-200 dark:bg-neutral-800">
-                  <Folder class="h-6 w-6 opacity-70" />
+          <div class="flex flex-wrap items-center gap-2 text-sm">
+            <label class="flex items-center gap-2 text-zinc-600 dark:text-zinc-300">
+              {{ t('dashboard.filterType') }}
+              <select v-model="itemFilter"
+                class="h-9 border border-zinc-300 bg-white px-2 text-zinc-950 outline-none focus:border-zinc-500 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white">
+                <option value="all">{{ t('dashboard.filterAll') }}</option>
+                <option value="folders">{{ t('dashboard.filterFolders') }}</option>
+                <option value="files">{{ t('dashboard.filterFiles') }}</option>
+              </select>
+            </label>
+            <label class="flex items-center gap-2 text-zinc-600 dark:text-zinc-300">
+              {{ t('dashboard.fileKind') }}
+              <select v-model="fileKindFilter"
+                class="h-9 border border-zinc-300 bg-white px-2 text-zinc-950 outline-none focus:border-zinc-500 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white">
+                <option value="all">{{ t('dashboard.filterAll') }}</option>
+                <option value="image">{{ t('dashboard.kindImage') }}</option>
+                <option value="video">{{ t('dashboard.kindVideo') }}</option>
+                <option value="audio">{{ t('dashboard.kindAudio') }}</option>
+                <option value="document">{{ t('dashboard.kindDocument') }}</option>
+                <option value="other">{{ t('dashboard.kindOther') }}</option>
+              </select>
+            </label>
+            <label class="flex items-center gap-2 text-zinc-600 dark:text-zinc-300">
+              {{ t('dashboard.sortBy') }}
+              <select v-model="sortBy"
+                class="h-9 border border-zinc-300 bg-white px-2 text-zinc-950 outline-none focus:border-zinc-500 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white">
+                <option value="name">{{ t('dashboard.columnName') }}</option>
+                <option value="type">{{ t('dashboard.columnType') }}</option>
+                <option value="date">{{ t('dashboard.columnDate') }}</option>
+                <option value="size">{{ t('dashboard.columnSize') }}</option>
+              </select>
+            </label>
+            <Button variant="ghost" class="h-9 cursor-pointer rounded-none" @click="toggleSortDirection">
+              <ArrowDownUp class="mr-2 h-4 w-4" />
+              {{ sortDirection === 'asc' ? t('dashboard.ascending') : t('dashboard.descending') }}
+            </Button>
+          </div>
+
+          <section class="min-w-0 border border-zinc-300 bg-white dark:border-neutral-700 dark:bg-neutral-950">
+            <div class="dashboard-table-row grid border-b border-zinc-300 bg-zinc-200/70 px-3 py-2 text-xs font-semibold uppercase text-zinc-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-zinc-300">
+              <span>{{ t('dashboard.columnName') }}</span>
+              <span>{{ t('dashboard.columnType') }}</span>
+              <span class="size-col">{{ t('dashboard.columnSize') }}</span>
+              <span class="date-col">{{ t('dashboard.columnDate') }}</span>
+              <span class="text-right">{{ t('dashboard.columnActions') }}</span>
+            </div>
+
+            <div v-for="item in tableRows" :key="item.key"
+              class="dashboard-table-row grid items-center border-b border-zinc-200 px-3 py-2 text-sm last:border-b-0 hover:bg-zinc-100 dark:border-neutral-800 dark:hover:bg-neutral-900/80"
+              @mouseenter="item.kind === 'file' && openFilePreview(item.file, $event)"
+              @mousemove="item.kind === 'file' && moveFilePreview($event)"
+              @mouseleave="scheduleHidePreview">
+              <button v-if="item.kind === 'folder'"
+                class="flex min-w-0 items-center gap-3 text-left font-medium text-zinc-950 dark:text-white"
+                @click="selectFolder(String(item.folder.id))">
+                <img v-if="item.folder.iconUrl" :src="item.folder.iconUrl" :alt="item.name"
+                  class="h-8 w-8 object-cover" />
+                <span v-else class="flex h-8 w-8 shrink-0 items-center justify-center bg-zinc-300 text-zinc-950 dark:bg-neutral-700 dark:text-white">
+                  <Folder class="h-4 w-4" />
                 </span>
-                <span class="line-clamp-2 break-words font-medium text-zinc-950 dark:text-white">{{ folder.name }}</span>
-                <span v-if="folder.shared" class="text-xs text-zinc-500 dark:text-zinc-400">{{ t('dashboard.shared') }}</span>
+                <span class="truncate">{{ item.name }}</span>
+                <span v-if="item.folder.shared" class="shrink-0 text-xs font-normal text-zinc-500 dark:text-zinc-400">
+                  {{ t('dashboard.shared') }}
+                </span>
               </button>
-              <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                  <Button variant="ghost" class="h-8 w-8 self-end px-0 cursor-pointer">
-                    <MoreHorizontal class="h-4 w-4" />
+              <NuxtLink v-else class="flex min-w-0 items-center gap-3 font-medium text-zinc-950 dark:text-white"
+                :to="fileDetailsLocation(item.file)">
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center bg-zinc-300 text-zinc-950 dark:bg-neutral-700 dark:text-white">
+                  <component :is="fileIcon(item.name)" class="h-4 w-4" />
+                </span>
+                <span class="truncate">{{ item.name }}</span>
+              </NuxtLink>
+
+              <span class="truncate text-zinc-600 dark:text-zinc-300">{{ item.typeLabel }}</span>
+              <span class="size-col truncate text-zinc-600 dark:text-zinc-300">{{ item.sizeLabel }}</span>
+              <span class="date-col truncate text-zinc-600 dark:text-zinc-300">{{ item.dateLabel }}</span>
+
+              <div class="dashboard-table-actions flex justify-end gap-1">
+                <DropdownMenu v-if="item.kind === 'folder'">
+                  <DropdownMenuTrigger as-child>
+                    <Button variant="ghost" class="h-8 w-8 rounded-none px-0 cursor-pointer">
+                      <MoreHorizontal class="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem v-if="item.folder.canManage" @click="openFolderSettings(item.folder)">
+                      {{ t('dashboard.folderSettings') }}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem @click="cloneFolder(item.folder)">
+                      {{ t('dashboard.cloneFolder') }}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem v-if="item.folder.canManage" class="text-red-600 focus:text-red-600" @click="deleteFolder(item.folder)">
+                      {{ t('dashboard.deleteFolder') }}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem v-if="item.folder.shared" class="text-red-600 focus:text-red-600" @click="leaveFolder(item.folder)">
+                      {{ t('dashboard.leaveSharedFolder') }}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <template v-else>
+                  <NuxtLink :to="fileDetailsLocation(item.file)">
+                    <Button variant="ghost" class="h-8 w-8 rounded-none px-0 cursor-pointer">
+                      <Eye class="h-4 w-4" />
+                    </Button>
+                  </NuxtLink>
+                  <Button variant="ghost" class="h-8 w-8 rounded-none px-0 cursor-pointer" @click="downloadFile(item.file)">
+                    <Download class="h-4 w-4" />
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem v-if="folder.canManage" @click="openFolderSettings(folder)">
-                    {{ t('dashboard.folderSettings') }}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem @click="cloneFolder(folder)">
-                    {{ t('dashboard.cloneFolder') }}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem v-if="folder.canManage" class="text-red-600 focus:text-red-600" @click="deleteFolder(folder)">
-                    {{ t('dashboard.deleteFolder') }}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem v-if="folder.shared" class="text-red-600 focus:text-red-600" @click="leaveFolder(folder)">
-                    {{ t('dashboard.leaveSharedFolder') }}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  <Button variant="ghost" class="h-8 w-8 rounded-none px-0 cursor-pointer text-red-600 hover:text-red-600"
+                    @click="deleteFile(item.file)">
+                    <Trash2 class="h-4 w-4" />
+                  </Button>
+                </template>
+              </div>
             </div>
           </section>
 
-          <section class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
-            <FileCard v-for="fileUpload in filteredUploads" :key="fileUpload.id" :file-id="fileUpload.id"
-              :file-name="fileUpload.fileName ?? ''" :folder-id="selectedFolderId" @deleted="removeUpload" />
-          </section>
-
-          <p v-if="filteredVisibleFolders.length === 0 && filteredUploads.length === 0"
-            class="rounded-md border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500 dark:border-neutral-700 dark:text-zinc-400">
+          <p v-if="tableRows.length === 0"
+            class="border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500 dark:border-neutral-700 dark:text-zinc-400">
             {{ t('dashboard.emptyFolder') }}
           </p>
         </div>
+
+        <ClientOnly>
+          <Teleport to="body">
+            <div v-if="previewFile && canPreviewFile(previewFile.fileName)" :style="previewStyle"
+              @mouseenter="cancelHidePreview" @mouseleave="scheduleHidePreview"
+              class="fixed z-[1000] overflow-hidden border border-zinc-300 bg-white text-zinc-950 shadow-2xl [color-scheme:light]">
+              <img v-if="isImageFile(previewFile.fileName)" :src="previewUrl(previewFile)" :alt="previewFile.fileName"
+                class="max-h-[var(--preview-height)] w-full object-contain bg-white" loading="lazy" />
+              <video v-else-if="isVideoFile(previewFile.fileName)" :src="previewUrl(previewFile)"
+                class="max-h-[var(--preview-height)] w-full bg-black" muted preload="metadata" />
+              <div v-else-if="isAudioFile(previewFile.fileName)" class="p-3">
+                <audio :src="previewUrl(previewFile)" class="w-full" controls preload="metadata" />
+              </div>
+              <iframe v-else-if="isPdfFile(previewFile.fileName)" :src="previewUrl(previewFile)"
+                class="h-[var(--preview-height)] w-full bg-white [color-scheme:light]" />
+              <iframe v-else :src="previewUrl(previewFile)"
+                class="h-[var(--preview-height)] w-full bg-white [color-scheme:light]" sandbox />
+            </div>
+          </Teleport>
+        </ClientOnly>
       </DashboardSidebar>
     </div>
   </div>
@@ -83,9 +179,10 @@
 <script lang="ts" setup>
 import { ref, computed, onBeforeUnmount, onMounted } from 'vue';
 import DashboardSidebar from "@/components/DashboardSidebar.vue"; // make sure to import it
-import { ArrowUp, Folder, MoreHorizontal } from "lucide-vue-next";
+import { ArrowDownUp, ArrowUp, Download, Eye, File as FileIcon, FileArchive, FileAudio, FileImage, FileSpreadsheet, FileText, FileVideo, Folder, MoreHorizontal, Trash2 } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { isAudioFile, isDocumentFile, isImageFile, isPdfFile, isPreviewableFile, isSpreadsheetFile, isTextFile, isVideoFile } from '~~/shared/utils/fileType';
 
 const {t} = useI18n();
 const route = useRoute();
@@ -127,6 +224,13 @@ const refreshingDashboard = ref(false);
 let dashboardRefreshTimer: number | undefined;
 
 const searchQuery = ref("");
+const itemFilter = ref<"all" | "folders" | "files">("all");
+const fileKindFilter = ref<"all" | "image" | "video" | "audio" | "document" | "other">("all");
+const sortBy = ref<"name" | "type" | "date" | "size">("name");
+const sortDirection = ref<"asc" | "desc">("asc");
+const previewFile = ref<any | null>(null);
+const previewStyle = ref<Record<string, string>>({});
+let hidePreviewTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const filteredUploads = computed(() => {
   if (!searchQuery.value) return userUploads.value;
@@ -152,6 +256,39 @@ const filteredVisibleFolders = computed(() => {
   const normalizedSearch = searchQuery.value.toLowerCase();
   return visibleFolders.value.filter(folder => folder.name.toLowerCase().includes(normalizedSearch));
 });
+const tableRows = computed(() => {
+  const folderRows = filteredVisibleFolders.value.map(folder => ({
+    key: `folder-${folder.id}`,
+    kind: "folder" as const,
+    folder,
+    file: null,
+    name: folder.name,
+    typeLabel: t('dashboard.folderType'),
+    size: -1,
+    sizeLabel: "--",
+    date: folder.createdAt ?? "",
+    dateLabel: formatDate(folder.createdAt),
+    fileKind: "folder"
+  }));
+  const fileRows = filteredUploads.value.map(file => ({
+    key: `file-${file.id}`,
+    kind: "file" as const,
+    folder: null,
+    file,
+    name: file.fileName ?? "",
+    typeLabel: fileTypeLabel(file.fileName ?? ""),
+    size: Number(file.size ?? 0),
+    sizeLabel: formatBytes(Number(file.size ?? 0)),
+    date: file.createdAt ?? "",
+    dateLabel: formatDate(file.createdAt),
+    fileKind: fileKind(file.fileName ?? "")
+  }));
+
+  return [...folderRows, ...fileRows]
+    .filter(item => itemFilter.value === "all" || itemFilter.value === `${item.kind}s`)
+    .filter(item => item.kind === "folder" || fileKindFilter.value === "all" || item.fileKind === fileKindFilter.value)
+    .sort((a, b) => compareRows(a, b));
+});
 const breadcrumbFolders = computed(() => {
   const path: FolderItem[] = [];
   let cursor = selectedFolder.value;
@@ -168,6 +305,159 @@ const breadcrumbFolders = computed(() => {
 
 function removeUpload(fileId: number) {
   userUploads.value = userUploads.value.filter(file => file.id !== fileId);
+}
+
+function fileKind(fileName: string) {
+  if (isImageFile(fileName)) return "image";
+  if (isVideoFile(fileName)) return "video";
+  if (isAudioFile(fileName)) return "audio";
+  if (isPdfFile(fileName) || isDocumentFile(fileName) || isSpreadsheetFile(fileName) || isTextFile(fileName)) return "document";
+  return "other";
+}
+
+function fileTypeLabel(fileName: string) {
+  const extension = fileName.includes(".") ? fileName.split(".").pop()?.toUpperCase() : "";
+  return extension || t('dashboard.fileType');
+}
+
+function fileIcon(fileName: string) {
+  if (isImageFile(fileName)) return FileImage;
+  if (isVideoFile(fileName)) return FileVideo;
+  if (isAudioFile(fileName)) return FileAudio;
+  if (isSpreadsheetFile(fileName)) return FileSpreadsheet;
+  if (isPdfFile(fileName) || isDocumentFile(fileName) || isTextFile(fileName)) return FileText;
+  if (/\.(zip|tar|gz|rar|7z)$/i.test(fileName)) return FileArchive;
+  return FileIcon;
+}
+
+function previewUrl(file: any) {
+  return `/api/preview/${file.id}`;
+}
+
+function canPreviewFile(fileName?: string | null) {
+  return isPreviewableFile(fileName ?? "");
+}
+
+function updatePreviewPosition(event: MouseEvent) {
+  const padding = 16;
+  const availableWidth = window.innerWidth - padding * 2;
+  const width = Math.min(384, availableWidth, Math.max(240, Math.round(window.innerWidth * 0.32)));
+  const previewHeight = Math.min(256, Math.max(176, Math.round(window.innerHeight * 0.38)));
+  let left = event.clientX + 16;
+  let top = event.clientY + 16;
+
+  if (left + width > window.innerWidth - padding) {
+    left = event.clientX - width - 16;
+  }
+
+  if (top + previewHeight > window.innerHeight - padding) {
+    top = event.clientY - previewHeight - 16;
+  }
+
+  previewStyle.value = {
+    left: `${Math.max(padding, left)}px`,
+    top: `${Math.max(padding, top)}px`,
+    width: `${width}px`,
+    "--preview-height": `${previewHeight}px`
+  };
+}
+
+function openFilePreview(file: any, event: MouseEvent) {
+  if (!canPreviewFile(file?.fileName)) {
+    return;
+  }
+
+  cancelHidePreview();
+  previewFile.value = file;
+  updatePreviewPosition(event);
+}
+
+function moveFilePreview(event: MouseEvent) {
+  if (previewFile.value) {
+    updatePreviewPosition(event);
+  }
+}
+
+function cancelHidePreview() {
+  if (hidePreviewTimeout) {
+    clearTimeout(hidePreviewTimeout);
+    hidePreviewTimeout = null;
+  }
+}
+
+function scheduleHidePreview() {
+  cancelHidePreview();
+  hidePreviewTimeout = setTimeout(() => {
+    previewFile.value = null;
+  }, 120);
+}
+
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "--";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let size = bytes;
+  let unitIndex = 0;
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+
+  return `${size >= 10 || unitIndex === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unitIndex]}`;
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "--";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "--" : date.toLocaleString();
+}
+
+function compareRows(a: any, b: any) {
+  if (a.kind !== b.kind) {
+    return a.kind === "folder" ? -1 : 1;
+  }
+
+  const direction = sortDirection.value === "asc" ? 1 : -1;
+  const aValue = sortBy.value === "size" ? a.size : sortBy.value === "date" ? a.date : sortBy.value === "type" ? a.typeLabel : a.name;
+  const bValue = sortBy.value === "size" ? b.size : sortBy.value === "date" ? b.date : sortBy.value === "type" ? b.typeLabel : b.name;
+
+  if (typeof aValue === "number" && typeof bValue === "number") {
+    return (aValue - bValue) * direction;
+  }
+
+  return String(aValue).localeCompare(String(bValue), undefined, { numeric: true, sensitivity: "base" }) * direction;
+}
+
+function toggleSortDirection() {
+  sortDirection.value = sortDirection.value === "asc" ? "desc" : "asc";
+}
+
+function fileDetailsLocation(file: any) {
+  return {
+    path: `/view/${file.id}`,
+    query: selectedFolderId.value ? { folderId: selectedFolderId.value } : {}
+  };
+}
+
+function downloadFile(file: any) {
+  const a = document.createElement("a");
+  a.href = `/api/download/${file.id}`;
+  a.download = file.fileName || "download";
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+async function deleteFile(file: any) {
+  if (!confirm(`Delete "${file.fileName}"? This cannot be undone.`)) {
+    return;
+  }
+
+  await $fetch(`/api/files/delete/${file.id}`, {
+    method: "POST"
+  });
+  removeUpload(file.id);
 }
 
 async function refreshUploads() {
@@ -259,6 +549,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  cancelHidePreview();
   if (dashboardRefreshTimer) {
     window.clearInterval(dashboardRefreshTimer);
   }
@@ -271,3 +562,38 @@ useHead({
   title: t("common.siteName") + " - " + t("dashboard.title")
 })
 </script>
+
+<style scoped>
+.dashboard-table-row {
+  grid-template-columns: minmax(0, 1fr) minmax(4.75rem, 0.32fr) minmax(4.5rem, 0.24fr) minmax(8rem, 0.42fr) 5.75rem;
+  column-gap: 0.75rem;
+}
+
+@media (max-width: 900px) {
+  .dashboard-table-row {
+    grid-template-columns: minmax(0, 1fr) minmax(4.5rem, 0.28fr) minmax(4.25rem, 0.22fr) 5.25rem;
+  }
+
+  .date-col {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-table-row {
+    grid-template-columns: minmax(0, 1fr) minmax(3.75rem, 0.24fr) 4.75rem;
+    column-gap: 0.5rem;
+  }
+
+  .size-col {
+    display: none;
+  }
+}
+
+@supports (-moz-appearance: none) {
+  :global(.dark) .dashboard-table-actions :deep(svg) {
+    color: white;
+    stroke: currentColor;
+  }
+}
+</style>

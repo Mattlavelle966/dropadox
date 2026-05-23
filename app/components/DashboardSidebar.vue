@@ -1,12 +1,12 @@
 <template>
-    <aside class="w-72 shrink-0 bg-zinc-300 dark:bg-neutral-900 dark:text-white flex flex-col p-4 space-y-6">
+    <aside class="w-56 shrink-0 bg-zinc-300 dark:bg-neutral-900 dark:text-white flex flex-col p-3 space-y-4">
         <div class="flex flex-col gap-2">
             <Input v-model="search" :placeholder="t('dashboard.searchFiles')"
-                class="border-zinc-300 bg-white dark:bg-neutral-800 dark:focus-visible:ring-neutral-300 focus-visible:ring-zinc-300" />
+                class="rounded-none border-zinc-300 bg-white dark:bg-neutral-800 dark:focus-visible:ring-neutral-300 focus-visible:ring-zinc-300" />
 
             <DropdownMenu>
                 <DropdownMenuTrigger as-child>
-                    <Button class="w-full cursor-pointer justify-between" variant="default">{{ t('common.words.new') }}
+                    <Button class="w-full cursor-pointer justify-between rounded-none" variant="default">{{ t('common.words.new') }}
                         <ChevronDown class="h-4 w-4" />
                     </Button>
                 </DropdownMenuTrigger>
@@ -18,39 +18,57 @@
         </div>
 
         <nav class="flex flex-col gap-2">
-            <Button variant="ghost" class="justify-start hover:bg-zinc-400/30 cursor-pointer"
+            <Button variant="ghost" class="justify-start rounded-none hover:bg-zinc-400/30 cursor-pointer"
                 @click="emit('select-folder', null)"
                 :class="{ 'bg-zinc-400/30': props.selectedFolderId === null }">
                 <Folder class="w-4 h-4 mr-2" />
                 {{ t('dashboard.myFiles') }}
             </Button>
             <NuxtLink to="/settings">
-                <Button variant="ghost" class="w-full justify-start hover:bg-zinc-400/30 cursor-pointer">
+                <Button variant="ghost" class="w-full justify-start rounded-none hover:bg-zinc-400/30 cursor-pointer">
                     <Settings class="w-4 h-4 mr-2" />
                     {{ t('common.nav.settings') }}
                 </Button>
             </NuxtLink>
+            <Button variant="ghost" class="w-full justify-start rounded-none hover:bg-zinc-400/30 cursor-pointer"
+                @click="openStorageDialog">
+                <HardDrive class="w-4 h-4 mr-2" />
+                {{ t('dashboard.storage') }}
+            </Button>
             <NuxtLink v-if="isAdmin" to="/admin">
-                <Button variant="ghost" class="w-full justify-start hover:bg-zinc-400/30 cursor-pointer">
+                <Button variant="ghost" class="w-full justify-start rounded-none hover:bg-zinc-400/30 cursor-pointer">
                     <Shield class="w-4 h-4 mr-2" />
                     {{ t('common.nav.admin') }}
                 </Button>
             </NuxtLink>
             <Button v-if="isLoggedIn" variant="ghost"
-                class="justify-start text-red-600 hover:bg-red-500/10 hover:text-red-600 cursor-pointer"
+                class="justify-start rounded-none text-red-600 hover:bg-red-500/10 hover:text-red-600 cursor-pointer"
                 @click="logoff">
                 <LogOut class="w-4 h-4 mr-2" />
                 {{ t('common.nav.logOut') }}
             </Button>
         </nav>
 
-        <div class="mt-auto text-sm text-black/80 dark:text-white/50">
+        <button type="button"
+            class="mt-auto flex flex-col gap-2 border border-zinc-400/40 bg-zinc-200/60 p-3 text-left text-xs text-zinc-700 transition hover:bg-zinc-200 dark:border-neutral-700 dark:bg-neutral-800/70 dark:text-zinc-300 dark:hover:bg-neutral-800"
+            @click="openStorageDialog">
+            <div class="flex w-full items-center justify-between gap-2">
+                <span class="font-medium text-zinc-900 dark:text-white">{{ t('dashboard.storage') }}</span>
+                <span>{{ storagePercentLabel }}</span>
+            </div>
+            <div class="h-1.5 w-full overflow-hidden bg-zinc-400/40 dark:bg-neutral-700">
+                <div class="h-full bg-blue-500 transition-[width]" :style="{ width: `${storagePercent}%` }"></div>
+            </div>
+            <span>{{ t('dashboard.storageRemaining', { remaining: storageRemainingLabel }) }}</span>
+        </button>
+
+        <div class="text-sm text-black/80 dark:text-white/50">
             © {{ new Date().getFullYear() }} {{ t('common.siteName') }}
         </div>
     </aside>
 
-    <div class="flex-1 flex flex-col w-full">
-        <main class="flex flex-col w-full gap-4 p-4 overflow-y-auto">
+    <div class="min-w-0 flex-1 flex flex-col w-full">
+        <main class="min-w-0 flex flex-col w-full gap-4 p-4 overflow-y-auto">
             <slot :open-folder-settings="openFolderSettings" :delete-folder="deleteFolder" :clone-folder="cloneFolder"
                 :leave-folder="leaveFolder" />
         </main>
@@ -61,7 +79,33 @@
                     <DialogTitle>{{ t('dashboard.uploadFileModalTitle') }}</DialogTitle>
                 </DialogHeader>
 
-                <fileUpload :folder-id="props.selectedFolderId" @uploaded="emit('uploaded')" />
+                <fileUpload :folder-id="props.selectedFolderId" @uploaded="handleUploaded" />
+            </DialogContent>
+        </Dialog>
+
+        <Dialog v-model:open="showStorageDialog">
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{{ t('dashboard.storage') }}</DialogTitle>
+                </DialogHeader>
+
+                <div class="flex flex-col gap-4">
+                    <div class="flex items-center justify-between gap-4 text-sm">
+                        <span class="text-zinc-600 dark:text-zinc-300">{{ t('dashboard.storageUsed') }}</span>
+                        <span class="font-medium">{{ storageUsedLabel }} / {{ storageMaxLabel }}</span>
+                    </div>
+                    <div class="h-3 w-full overflow-hidden rounded bg-zinc-200 dark:bg-neutral-800">
+                        <div class="h-full rounded bg-blue-500 transition-[width]" :style="{ width: `${storagePercent}%` }"></div>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 text-sm">
+                        <span class="text-zinc-600 dark:text-zinc-300">{{ t('dashboard.storageRemainingLabel') }}</span>
+                        <span class="font-medium">{{ storageRemainingLabel }}</span>
+                    </div>
+                    <p v-if="storageError" class="text-sm text-red-500">{{ storageError }}</p>
+                    <Button variant="ghost" class="cursor-pointer justify-start" @click="refreshStorage">
+                        {{ t('dashboard.refreshStorage') }}
+                    </Button>
+                </div>
             </DialogContent>
         </Dialog>
 
@@ -250,8 +294,8 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, watch } from 'vue';
-import { Folder, ChevronDown, X, Settings, Shield, LogOut } from "lucide-vue-next";
+import { computed, onMounted, ref, watch } from 'vue';
+import { Folder, ChevronDown, X, Settings, Shield, LogOut, HardDrive } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -261,11 +305,12 @@ const router = useRouter();
 const { data: session } = await useFetch("/api/verifyToken", {
     method: "POST"
 });
-const isLoggedIn = computed(() => Boolean(session.value));
+const isLoggedIn = computed(() => Boolean(session.value?.authenticated && session.value?.id));
 const isAdmin = computed(() => session.value?.role === "admin");
 const showUploadFile = ref(false)
 const showCreateFolder = ref(false)
 const showFolderSettings = ref(false)
+const showStorageDialog = ref(false)
 const folderName = ref("")
 const folderError = ref("")
 const settingsFolder = ref<FolderItem | null>(null)
@@ -280,6 +325,8 @@ const userSearch = ref("")
 const userResults = ref<Array<{ id: number; name: string; email: string; avatarUrl?: string | null }>>([])
 const selectedUsers = ref<Array<{ id: number; name: string; email: string; avatarUrl?: string | null }>>([])
 const sharedUsers = ref<Array<{ id: number; name: string; email: string; role?: string; avatarUrl?: string | null }>>([])
+const storage = ref({ usedBytes: 0, maxBytes: 0, remainingBytes: 0, usedPercent: 0 })
+const storageError = ref("")
 
 type FolderItem = {
     id: number;
@@ -305,6 +352,11 @@ const emit = defineEmits<{
 }>();
 
 const search = ref(props.search ?? "");
+const storagePercent = computed(() => Math.min(100, Math.max(0, storage.value.usedPercent || 0)));
+const storagePercentLabel = computed(() => `${storagePercent.value.toFixed(storagePercent.value % 1 === 0 ? 0 : 1)}%`);
+const storageUsedLabel = computed(() => formatBytes(storage.value.usedBytes));
+const storageMaxLabel = computed(() => formatBytes(storage.value.maxBytes));
+const storageRemainingLabel = computed(() => formatBytes(storage.value.remainingBytes));
 
 // Keep v-model in sync
 watch(search, (val: string) => emit("update:search", val));
@@ -314,8 +366,56 @@ watch(() => props.search, (val) => {
     }
 });
 
+watch(showStorageDialog, (open) => {
+    if (open) {
+        refreshStorage();
+    }
+});
+
+onMounted(() => {
+    refreshStorage();
+});
+
 function initials(value = "") {
     return value.trim().slice(0, 2).toUpperCase() || "??";
+}
+
+function formatBytes(bytes: number) {
+    if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let size = bytes;
+    let unitIndex = 0;
+
+    while (size >= 1024 && unitIndex < units.length - 1) {
+        size /= 1024;
+        unitIndex += 1;
+    }
+
+    return `${size >= 10 || unitIndex === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unitIndex]}`;
+}
+
+async function refreshStorage() {
+    if (!isLoggedIn.value) {
+        return;
+    }
+
+    storageError.value = "";
+
+    try {
+        storage.value = await $fetch<typeof storage.value>("/api/storage");
+    } catch (err: any) {
+        storageError.value = err?.data?.statusMessage || err?.statusMessage || "Could not load storage";
+    }
+}
+
+async function openStorageDialog() {
+    showStorageDialog.value = true;
+    await refreshStorage();
+}
+
+async function handleUploaded() {
+    await refreshStorage();
+    emit('uploaded');
 }
 
 async function createFolder() {
@@ -347,7 +447,7 @@ async function logoff() {
     await $fetch("/api/logout", {
         method: "POST"
     });
-    session.value = null;
+    session.value = { authenticated: false };
     await router.push("/");
 }
 

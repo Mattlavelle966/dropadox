@@ -61,12 +61,12 @@ const { data: session } = await useFetch("/api/verifyToken", {
     method: "POST"
 });
 const route = useRoute();
-const isLoggedIn = computed(() => Boolean(session.value));
+const isLoggedIn = computed(() => Boolean(session.value?.authenticated && session.value?.id));
 const isAdmin = computed(() => session.value?.role === "admin");
 const isDashboard = computed(() => route.path === "/dashboard");
 const avatarVersion = ref(Date.now());
 const showAvatar = ref(true);
-const avatarUrl = computed(() => session.value ? `/api/users/avatar/${session.value.id}?v=${avatarVersion.value}` : "");
+const avatarUrl = computed(() => isLoggedIn.value ? `/api/users/avatar/${session.value?.id}?v=${avatarVersion.value}` : "");
 const userInitials = computed(() => {
     const source = String(session.value?.username || session.value?.emailAddress || "?");
     return source.slice(0, 2).toUpperCase();
@@ -77,7 +77,7 @@ async function logoff() {
         await $fetch("/api/logout", {
             method: "POST"
         });
-        session.value = null;
+        session.value = { authenticated: false };
         await router.push('/')
     }
 }
