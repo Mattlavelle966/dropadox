@@ -2,6 +2,7 @@ import { uploads } from '~~/server/database/schema';
 import { and, eq, isNull } from 'drizzle-orm';
 import { getUserFromPayload } from '~~/server/utils/getUser';
 import { getStoredFileName } from '~~/server/utils/fileStorage';
+import { getUsersByIdMetadata } from '~~/server/utils/peopleMetadata';
 
 export default defineEventHandler(async (event) => {
     const body = await readBody(event);
@@ -33,9 +34,11 @@ export default defineEventHandler(async (event) => {
         uploadFilter = eq(uploads.folderId, String(folderId));
     }
 
-    const userUploads = await useDrizzle().select().from(uploads)
+    const db = useDrizzle();
+    const userUploads = await db.select().from(uploads)
         .where(uploadFilter)
         .all()
+    const uploaders = await getUsersByIdMetadata(db, userUploads.map((upload) => upload.userId ?? ""));
 
     return {
         userUploads: userUploads.map(upload => ({
@@ -45,7 +48,8 @@ export default defineEventHandler(async (event) => {
             privacyFlag: upload.privacyFlag,
             size: upload.size,
             createdAt: upload.createdAt,
-            fileName: upload.filePath ? getStoredFileName(upload.filePath) : null
+            fileName: upload.filePath ? getStoredFileName(upload.filePath) : null,
+            uploader: upload.userId ? uploaders.get(Number(upload.userId)) ?? null : null
         }))
     }
 });
