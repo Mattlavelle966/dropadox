@@ -38,6 +38,11 @@
                     </div>
                 </div>
             </NuxtLink>
+            <NuxtLink to="/admin" v-if="isAdmin">
+                <Button variant="default" class="m-2 pointer-events-auto cursor-pointer shadow-md">
+                    {{ t("common.nav.admin") }}
+                </Button>
+            </NuxtLink>
             <Button @click="logoff" variant="default"
                 class="m-2 border-black bg-red-500 hover:bg-red-400 text-white shadow-md hover:text-white pointer-events-auto cursor-pointer"
                 v-if="isLoggedIn">
@@ -56,6 +61,7 @@ const { data: session } = await useFetch("/api/verifyToken", {
     method: "POST"
 });
 const isLoggedIn = computed(() => Boolean(session.value));
+const isAdmin = computed(() => session.value?.role === "admin");
 const avatarVersion = ref(Date.now());
 const showAvatar = ref(true);
 const avatarUrl = computed(() => session.value ? `/api/users/avatar/${session.value.id}?v=${avatarVersion.value}` : "");

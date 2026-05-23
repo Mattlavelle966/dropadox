@@ -159,6 +159,31 @@
                     </section>
 
                     <section class="flex flex-col gap-2">
+                        <h3 class="text-sm font-semibold">{{ t('dashboard.publishFolder') }}</h3>
+                        <textarea v-model="publishedMarkdown"
+                            class="min-h-28 rounded-md border border-zinc-300 bg-white p-2 text-sm text-zinc-900 outline-none focus:border-ring focus:ring-ring/50 focus:ring-[3px] dark:border-neutral-700 dark:bg-neutral-800 dark:text-white"
+                            :placeholder="t('dashboard.publishMarkdownPlaceholder')"></textarea>
+                        <div class="flex gap-2">
+                            <Button class="cursor-pointer" @click="publishFolder">
+                                {{ publishedUrl ? t('dashboard.updatePublishedFolder') : t('dashboard.publishFolderAction') }}
+                            </Button>
+                            <Button v-if="publishedUrl" variant="ghost" class="cursor-pointer text-red-600 hover:text-red-600"
+                                @click="removePublishedFolder">
+                                {{ t('dashboard.unpublishFolder') }}
+                            </Button>
+                        </div>
+                        <div v-if="publishedUrl" class="flex gap-2">
+                            <Input :model-value="publishedUrl" readonly />
+                            <Button class="cursor-pointer" @click="copyPublishedUrl">
+                                {{ t('dashboard.copyLink') }}
+                            </Button>
+                        </div>
+                        <p v-if="publishedUrl" class="text-xs text-zinc-500 dark:text-zinc-400">
+                            {{ t('dashboard.publishedLikes', { count: publishedLikes }) }}
+                        </p>
+                    </section>
+
+                    <section class="flex flex-col gap-2">
                         <h3 class="text-sm font-semibold">{{ t('dashboard.peopleWithAccess') }}</h3>
                         <div v-if="sharedUsers.length" class="flex flex-col gap-2">
                             <div v-for="user in sharedUsers" :key="user.id"
@@ -243,6 +268,9 @@ const settingsFolderName = ref("")
 const settingsError = ref("")
 const settingsMessage = ref("")
 const publicShareUrl = ref("")
+const publishedUrl = ref("")
+const publishedMarkdown = ref("")
+const publishedLikes = ref(0)
 const userSearch = ref("")
 const userResults = ref<Array<{ id: number; name: string; email: string; avatarUrl?: string | null }>>([])
 const selectedUsers = ref<Array<{ id: number; name: string; email: string; avatarUrl?: string | null }>>([])
@@ -302,6 +330,9 @@ async function openFolderSettings(folder: FolderItem) {
     settingsFolder.value = folder;
     settingsFolderName.value = folder.name;
     publicShareUrl.value = "";
+    publishedUrl.value = "";
+    publishedMarkdown.value = "";
+    publishedLikes.value = 0;
     userSearch.value = "";
     userResults.value = [];
     selectedUsers.value = [];
@@ -326,17 +357,80 @@ async function loadFolderSettings() {
         const res = await $fetch<{
             folder: FolderItem;
             publicShares: Array<{ url: string }>;
+            publishedShare: { url: string; markdown: string; likes: number } | null;
             sharedUsers: Array<{ id: number; name: string; email: string; avatarUrl?: string | null }>;
         }>(`/api/folders/settings/${settingsFolder.value.id}`);
 
         settingsFolder.value = { ...settingsFolder.value, name: res.folder.name };
         settingsFolderName.value = res.folder.name;
         publicShareUrl.value = firstPublicShareUrl(res.publicShares);
+        publishedUrl.value = res.publishedShare ? `${window.location.origin}${res.publishedShare.url}` : "";
+        publishedMarkdown.value = res.publishedShare?.markdown ?? "";
+        publishedLikes.value = res.publishedShare?.likes ?? 0;
         sharedUsers.value = res.sharedUsers;
         emit("folder-updated", settingsFolder.value);
     } catch (err: any) {
         settingsError.value = err?.data?.statusMessage || err?.statusMessage || "Could not load folder settings";
     }
+}
+
+async function publishFolder() {
+    if (!settingsFolder.value) {
+        return;
+    }
+
+    settingsError.value = "";
+    settingsMessage.value = "";
+
+    try {
+        const res = await $fetch<{ share: { url: string; markdown: string; likes: number } }>(`/api/folders/publish/${settingsFolder.value.id}`, {
+            method: "POST",
+            body: {
+                markdown: publishedMarkdown.value
+            }
+        });
+
+        publishedUrl.value = `${window.location.origin}${res.share.url}`;
+        publishedMarkdown.value = res.share.markdown;
+        publishedLikes.value = res.share.likes;
+        settingsMessage.value = t('dashboard.folderPublished');
+    } catch (err: any) {
+        settingsError.value = err?.data?.statusMessage || err?.statusMessage || "Could not publish folder";
+    }
+}
+
+async function removePublishedFolder() {
+    if (!settingsFolder.value) {
+        return;
+    }
+
+    if (!confirm(t('dashboard.confirmUnpublishFolder'))) {
+        return;
+    }
+
+    settingsError.value = "";
+    settingsMessage.value = "";
+
+    try {
+        await $fetch(`/api/folders/publish/remove/${settingsFolder.value.id}`, {
+            method: "POST"
+        });
+
+        publishedUrl.value = "";
+        publishedLikes.value = 0;
+        settingsMessage.value = t('dashboard.folderUnpublished');
+    } catch (err: any) {
+        settingsError.value = err?.data?.statusMessage || err?.statusMessage || "Could not unpublish folder";
+    }
+}
+
+async function copyPublishedUrl() {
+    if (!publishedUrl.value) {
+        return;
+    }
+
+    await navigator.clipboard.writeText(publishedUrl.value);
+    settingsMessage.value = t('dashboard.linkCopied');
 }
 
 async function uploadFolderIcon(event: Event) {

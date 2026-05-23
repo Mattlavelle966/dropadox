@@ -1,0 +1,15 @@
+{
+    "admin": {
+        "title": "Admin",
+        "description": "Manage users and folders without browsing folder contents.",
+        "users": "Users",
+        "folders": "Folders",
+        "files": "files",
+        "published": "published",
+        "likes": "likes",
+        "deleteUser": "Delete user",
+        "deleteFolder": "Delete folder",
+        "confirmDeleteUser": "Delete {email} and all folders/files they own? This cannot be undone.",
+        "confirmDeleteFolder": "Delete folder \"{name}\" and all files inside it? This cannot be undone."
+    }
+}

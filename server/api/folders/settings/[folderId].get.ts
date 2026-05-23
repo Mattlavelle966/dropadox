@@ -1,5 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
-import { folderPublicShares, folderUserShares, folders, userSettings, users } from "~~/server/database/schema";
+import { folderPublicShares, folderPublishedShares, folderUserShares, folders, userSettings, users } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
     const folderId = Number(getRouterParam(event, "folderId"));
@@ -48,12 +48,28 @@ export default defineEventHandler(async (event) => {
         ))
         .all();
 
+    const publishedShare = await db.select({
+        token: folderPublishedShares.token,
+        markdown: folderPublishedShares.markdown,
+        likes: folderPublishedShares.likes,
+        createdAt: folderPublishedShares.createdAt
+    }).from(folderPublishedShares)
+        .where(and(
+            eq(folderPublishedShares.folderId, String(folderId)),
+            eq(folderPublishedShares.userId, userId)
+        ))
+        .get();
+
     return {
         folder: folderResponse(folder, false),
         publicShares: publicShares.map((share) => ({
             ...share,
             url: `/share/folder/${share.token}`
         })),
+        publishedShare: publishedShare ? {
+            ...publishedShare,
+            url: `/share/folder/${publishedShare.token}`
+        } : null,
         sharedUsers: sharedUsers.map((user) => ({
             shareId: user.shareId,
             id: user.id,

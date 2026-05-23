@@ -18,7 +18,8 @@ export default defineNuxtConfig({
           'en/signUp.json', 
           'en/dashboard.json', 
           'en/settings.json',
-          'en/view.json'
+          'en/view.json',
+          'en/admin.json'
         ]
       }
     ],

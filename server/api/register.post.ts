@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { users } from "../database/schema";
 import { userSettings } from "../database/schema";
 
@@ -50,12 +50,19 @@ export default defineEventHandler(async (event) => {
         })
     }
 
+    const userCount = await useDrizzle()
+        .select({ count: sql<number>`count(*)` })
+        .from(users)
+        .get();
+    const role = Number(userCount?.count ?? 0) === 0 ? "admin" : "user";
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = await useDrizzle().insert(users).values({
         name: username,
         password: hashedPassword,
-        email: email
+        email: email,
+        role
     }).returning().get();
 
     consumeSignupChallengeToken(String(challengeToken));
@@ -72,6 +79,7 @@ export default defineEventHandler(async (event) => {
             id: newUser.id,
             name: newUser.name,
             email: newUser.email,
+            role: newUser.role,
             createdAt: newUser.createdAt
         }
     };

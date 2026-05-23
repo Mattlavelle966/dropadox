@@ -6,6 +6,7 @@ export const users = sqliteTable("users", {
     name: text("name").notNull(),
     password: text("password").notNull(),
     email: text("email").notNull(),
+    role: text("role").notNull().default("user"),
     createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
 })
 
@@ -33,6 +34,16 @@ export const folderPublicShares = sqliteTable("folderPublicShares", {
     userId: text("user_id").references(() => users.id),
     token: text("token").notNull(),
     expiresAt: text("expires_at"),
+    createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
+})
+
+export const folderPublishedShares = sqliteTable("folderPublishedShares", {
+    id: int("id").primaryKey({ autoIncrement: true }),
+    folderId: text("folder_id").references(() => folders.id),
+    userId: text("user_id").references(() => users.id),
+    token: text("token").notNull(),
+    markdown: text("markdown").default(""),
+    likes: int("likes").default(0),
     createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
 })
 

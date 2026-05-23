@@ -1,5 +1,5 @@
 import { like, ne, and, or, sql } from "drizzle-orm";
-import { users } from "~~/server/database/schema";
+import { userSettings, users } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
     const query = getQuery(event);
@@ -15,23 +15,19 @@ export default defineEventHandler(async (event) => {
         id: users.id,
         name: users.name,
         email: users.email,
-        avatarPath: sql<string | null>`(
-            select avatar_path from userSettings
-            where userSettings.user_id = cast(${users.id} as text)
-            limit 1
-        )`
+        avatarPath: userSettings.avatarPath
     }).from(users)
+        .leftJoin(userSettings, sql`${userSettings.userID} = cast(${users.id} as text)`)
         .where(and(
             or(
                 like(users.email, `%${search}%`),
                 like(users.name, `%${search}%`)
             ),
             ne(users.id, Number(userPayload.id)),
-            sql`not exists (
-                select 1 from userSettings
-                where userSettings.user_id = cast(${users.id} as text)
-                and userSettings.search_visible = 'false'
-            )`
+            or(
+                sql`${userSettings.searchVisible} is null`,
+                ne(userSettings.searchVisible, "false")
+            )
         ))
         .limit(10)
         .all();

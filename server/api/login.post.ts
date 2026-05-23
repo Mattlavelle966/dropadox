@@ -61,7 +61,8 @@ export default defineEventHandler(async (event) => {
     const token = jwt.sign({
         username: user.name,
         emailAddress: user.email,
-        id: user.id
+        id: user.id,
+        role: user.role
     }, process.env.JSON_SECRET_KEY!, { expiresIn: "48h" })
 
     setCookie(event, "token", token, {

@@ -1,6 +1,6 @@
 import fs from "fs";
 import { and, eq } from "drizzle-orm";
-import { folderPublicShares, uploads } from "~~/server/database/schema";
+import { uploads } from "~~/server/database/schema";
 import { isHtmlPreviewFile, isNativePreviewFile } from "~~/shared/utils/fileType";
 import { getStoredFileName } from "~~/server/utils/fileStorage";
 import { renderDocumentPreview } from "~~/server/utils/renderDocumentPreview";
@@ -14,17 +14,7 @@ export default defineEventHandler(async (event) => {
     }
 
     const db = useDrizzle();
-    const share = await db.select().from(folderPublicShares)
-        .where(eq(folderPublicShares.token, shareToken))
-        .get();
-
-    if (!share?.folderId) {
-        throw createError({ statusCode: 404, statusMessage: "Share not found" });
-    }
-
-    if (share.expiresAt && new Date(share.expiresAt).getTime() <= Date.now()) {
-        throw createError({ statusCode: 410, statusMessage: "Share link expired" });
-    }
+    const share = await getPublicFolderShare(db, shareToken);
 
     const upload = await db.select().from(uploads)
         .where(and(eq(uploads.id, fileId), eq(uploads.folderId, share.folderId)))

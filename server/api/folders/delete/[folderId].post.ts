@@ -1,6 +1,5 @@
-import fs from "fs";
 import { and, eq } from "drizzle-orm";
-import { folderPublicShares, folderUserShares, folders, uploads } from "~~/server/database/schema";
+import { folders } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
     const folderId = Number(getRouterParam(event, "folderId"));
@@ -30,42 +29,11 @@ export default defineEventHandler(async (event) => {
         });
     }
 
-    const folderUploads = await db.select().from(uploads)
-        .where(eq(uploads.folderId, String(folderId)))
-        .all();
-
-    for (const upload of folderUploads) {
-        if (upload.filePath && fs.existsSync(upload.filePath)) {
-            fs.unlinkSync(upload.filePath);
-        }
-    }
-
-    removeStoredImage(folder.iconPath);
-
-    await db.delete(uploads)
-        .where(eq(uploads.folderId, String(folderId)));
-
-    await db.delete(folderPublicShares)
-        .where(and(
-            eq(folderPublicShares.folderId, String(folderId)),
-            eq(folderPublicShares.userId, userId)
-        ));
-
-    await db.delete(folderUserShares)
-        .where(and(
-            eq(folderUserShares.folderId, String(folderId)),
-            eq(folderUserShares.ownerId, userId)
-        ));
-
-    await db.delete(folders)
-        .where(and(
-            eq(folders.id, folderId),
-            eq(folders.userId, userId)
-        ));
+    const result = await deleteFolderWithContents(db, folderId);
 
     return {
-        deleted: true,
+        deleted: result.deleted,
         folderId,
-        deletedFiles: folderUploads.length
+        deletedFiles: result.deletedFiles
     };
 });
