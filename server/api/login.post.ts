@@ -3,6 +3,13 @@ import { users } from '../database/schema';
 import { User } from '../utils/useDrizzle';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+
+const invalidCredentialsError = () => createError({
+    status: 401,
+    statusText: "Invalid email, username, or password."
+});
+const dummyPasswordHash = "$2a$10$CwTycUXWue0Thq9StjUM0uJ8J4qz8XcXtU1qFufVbEZmTlhfKjB7K";
+
 export default defineEventHandler(async (event) => {
     enforceRateLimit(event, "login", 10, 60_000);
 
@@ -53,19 +60,9 @@ export default defineEventHandler(async (event) => {
             .get();
     }
 
-    if (!user) {
-        throw createError({
-            status: 404,
-            statusText: "User could not be found!"
-        })
-    }
-
-    const verificiation = await bcrypt.compare(passwordValue, user.password ?? '')
-    if (!verificiation) {
-        throw createError({
-            status: 400,
-            statusText: "Password is not correct."
-        })
+    const verificiation = await bcrypt.compare(passwordValue, user?.password ?? dummyPasswordHash)
+    if (!user || !verificiation) {
+        throw invalidCredentialsError();
     }
  
     const token = jwt.sign({

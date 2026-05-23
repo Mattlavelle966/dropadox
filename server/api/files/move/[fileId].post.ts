@@ -1,5 +1,24 @@
 import { eq } from "drizzle-orm";
 import { uploads } from "~~/server/database/schema";
+import { getUserStorageBytes } from "~~/server/database/userStorage";
+import { getUserStorageMaxBytes } from "~~/server/utils/storageQuota";
+
+async function assertTargetOwnerHasCapacity(db: any, ownerId: string, fileBytes: number) {
+    const maxBytes = await getUserStorageMaxBytes(db, ownerId);
+    const usedBytes = await getUserStorageBytes(ownerId);
+
+    if (usedBytes + fileBytes > maxBytes) {
+        throw createError({
+            statusCode: 413,
+            statusMessage: "MAXIMUM_STORAGE_REACHED",
+            data: {
+                maxBytes,
+                usedBytes,
+                fileBytes
+            }
+        });
+    }
+}
 
 export default defineEventHandler(async (event) => {
     const fileId = Number(getRouterParam(event, "fileId"));
@@ -25,7 +44,7 @@ export default defineEventHandler(async (event) => {
     if (upload.folderId) {
         const currentAccess = await getFolderAccess(db, String(upload.folderId), userId);
 
-        if (!currentAccess || (!currentAccess.isOwner && !currentAccess.isSharedWithUser)) {
+        if (!currentAccess?.isOwner) {
             throw createError({ statusCode: 404, statusMessage: "File not found" });
         }
     } else if (upload.userId !== userId) {
@@ -44,6 +63,10 @@ export default defineEventHandler(async (event) => {
         nextUserId = String(targetAccess.folder.userId);
     } else if (upload.userId !== userId) {
         throw createError({ statusCode: 403, statusMessage: "Cannot move this file to your root" });
+    }
+
+    if (nextUserId !== upload.userId) {
+        await assertTargetOwnerHasCapacity(db, nextUserId, upload.size ?? 0);
     }
 
     const movedFile = await db.update(uploads)

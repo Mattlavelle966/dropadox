@@ -20,6 +20,34 @@ function removeFileIfExists(filePath?: string) {
     }
 }
 
+async function assertStorageCapacity(db: any, ownerId: string, fileBytes: number) {
+    const maxBytes = await getUserStorageMaxBytes(db, ownerId);
+    const usedBytes = await getUserStorageBytes(ownerId);
+
+    if (fileBytes > maxBytes) {
+        throw createError({
+            statusCode: 413,
+            statusMessage: "FILE_TOO_LARGE",
+            data: {
+                maxBytes,
+                fileBytes
+            }
+        });
+    }
+
+    if (usedBytes + fileBytes > maxBytes) {
+        throw createError({
+            statusCode: 413,
+            statusMessage: "MAXIMUM_STORAGE_REACHED",
+            data: {
+                maxBytes,
+                usedBytes,
+                fileBytes
+            }
+        });
+    }
+}
+
 async function parseUpload(event: any, maxBytes: number, limitStatus = "FILE_TOO_LARGE"): Promise<ParsedUpload> {
     const uploadDir = getUploadDir();
     return new Promise((resolve, reject) => {
@@ -139,9 +167,10 @@ export default defineEventHandler(async (event) => {
         }
 
         const folderId = parsed.folderId ? String(parsed.folderId) : null;
+        let folderAccess = null;
 
         if (folderId) {
-            const folderAccess = await getFolderAccess(db, folderId, userId);
+            folderAccess = await getFolderAccess(db, folderId, userId);
 
             if (!folderAccess || (!folderAccess.isOwner && !folderAccess.isSharedWithUser)) {
                 throw createError({
@@ -151,33 +180,12 @@ export default defineEventHandler(async (event) => {
             }
         }
 
-        if (parsed.size > maxBytes) {
-            throw createError({
-                statusCode: 413,
-                statusMessage: "FILE_TOO_LARGE",
-                data: {
-                    maxBytes,
-                    fileBytes: parsed.size
-                }
-            });
-        }
+        const storageOwnerId = folderAccess ? String(folderAccess.folder.userId) : userId;
+        await assertStorageCapacity(db, storageOwnerId, parsed.size);
 
-        if (usedBytes + parsed.size > maxBytes) {
-            throw createError({
-                statusCode: 413,
-                statusMessage: "MAXIMUM_STORAGE_REACHED",
-                data: {
-                    maxBytes,
-                    usedBytes,
-                    fileBytes: parsed.size
-                }
-            });
-        }
-
-        const folderAccess = folderId ? await getFolderAccess(db, folderId, userId) : null;
         const upload = await db.insert(uploads)
             .values({
-                userId: folderAccess ? String(folderAccess.folder.userId) : userId,
+                userId: storageOwnerId,
                 folderId,
                 filePath: parsed.uploadPath,
                 privacyFlag: "private",
