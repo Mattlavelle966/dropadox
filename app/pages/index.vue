@@ -37,9 +37,8 @@
               </div>
             </div>
 
-            <p class="mt-3 line-clamp-4 whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">
-              {{ folder.markdown || t("index.noDescription") }}
-            </p>
+            <div class="published-markdown mt-3 line-clamp-5 text-sm text-zinc-700 dark:text-zinc-300"
+              v-html="renderSafeMarkdown(folder.markdown || t('index.noDescription'))"></div>
 
             <div class="mt-4 flex items-center justify-between gap-3">
               <NuxtLink :to="folder.url" class="text-sm font-medium text-blue-600 hover:text-blue-500">
@@ -65,6 +64,7 @@
 </template>
 <script setup lang="ts">
 import { Folder, Heart } from "lucide-vue-next";
+import { renderSafeMarkdown } from "~~/shared/utils/markdown";
 import Footer from "~/components/Footer.vue";
 
 const {t} = useI18n();
@@ -93,3 +93,32 @@ useHead({
   title: t("common.siteName") + " - " + t("common.words.welcome")
 })
 </script>
+
+<style scoped>
+.published-markdown :deep(h2),
+.published-markdown :deep(h3),
+.published-markdown :deep(h4) {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+}
+
+.published-markdown :deep(p) {
+  margin: 0 0 0.4rem;
+}
+
+.published-markdown :deep(ul) {
+  margin: 0 0 0.4rem 1rem;
+  list-style: disc;
+}
+
+.published-markdown :deep(code) {
+  border-radius: 0.25rem;
+  background: rgb(228 228 231);
+  padding: 0.05rem 0.25rem;
+}
+
+.published-markdown :deep(a) {
+  color: rgb(37 99 235);
+  font-weight: 600;
+}
+</style>

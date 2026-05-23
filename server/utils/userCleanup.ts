@@ -1,4 +1,3 @@
-import fs from "fs";
 import { eq, or } from "drizzle-orm";
 import { folderUserShares, folders, uploads, userSettings, users } from "~~/server/database/schema";
 
@@ -36,12 +35,9 @@ export async function deleteUserWithOwnedData(db: any, userId: number | string) 
         .all();
 
     for (const upload of orphanUploads) {
-        if (upload.filePath && fs.existsSync(upload.filePath)) {
-            fs.unlinkSync(upload.filePath);
-        }
+        await removeUploadReference(db, upload);
     }
 
-    await db.delete(uploads).where(eq(uploads.userId, String(id)));
     await db.delete(folderUserShares).where(or(
         eq(folderUserShares.ownerId, String(id)),
         eq(folderUserShares.sharedWithUserId, String(id))

@@ -1,10 +1,10 @@
 import { and, eq } from "drizzle-orm";
-import { folderUserShares, folders, userSettings, users } from "~~/server/database/schema";
+import { folderUserShares, userSettings, users } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
     enforceRateLimit(event, "folder-user-share", 60, 60_000);
     const folderId = Number(getRouterParam(event, "folderId"));
-    const { userId, userIds } = await readBody(event);
+    const { userId, userIds, role } = await readBody(event);
     const targetUserIds = Array.isArray(userIds)
         ? userIds.map((id) => String(id))
         : userId
@@ -16,21 +16,21 @@ export default defineEventHandler(async (event) => {
     }
 
     const userPayload = getAuthenticatedUserPayload(event);
-    const ownerId = String(userPayload.id);
+    const currentUserId = String(userPayload.id);
     const db = useDrizzle();
 
-    const folder = await db.select().from(folders)
-        .where(and(eq(folders.id, folderId), eq(folders.userId, ownerId)))
-        .get();
+    const folderAccess = await getFolderAccess(db, String(folderId), currentUserId);
 
-    if (!folder) {
+    if (!folderAccess?.isOwner) {
         throw createError({ statusCode: 404, statusMessage: "Folder not found" });
     }
 
+    const shareRole = role === "owner" ? "owner" : "member";
+    const canonicalOwnerId = String(folderAccess.folder.userId);
     const sharedUsers = [];
 
     for (const targetUserId of [...new Set(targetUserIds)]) {
-        if (targetUserId === ownerId) {
+        if (targetUserId === canonicalOwnerId) {
             continue;
         }
 
@@ -45,7 +45,6 @@ export default defineEventHandler(async (event) => {
         const existingShare = await db.select().from(folderUserShares)
             .where(and(
                 eq(folderUserShares.folderId, String(folderId)),
-                eq(folderUserShares.ownerId, ownerId),
                 eq(folderUserShares.sharedWithUserId, targetUserId)
             ))
             .get();
@@ -53,9 +52,14 @@ export default defineEventHandler(async (event) => {
         if (!existingShare) {
             await db.insert(folderUserShares).values({
                 folderId: String(folderId),
-                ownerId,
-                sharedWithUserId: targetUserId
+                ownerId: canonicalOwnerId,
+                sharedWithUserId: targetUserId,
+                role: shareRole
             });
+        } else {
+            await db.update(folderUserShares)
+                .set({ role: shareRole })
+                .where(eq(folderUserShares.id, existingShare.id));
         }
 
         const targetSettings = await db.select().from(userSettings)
@@ -67,6 +71,7 @@ export default defineEventHandler(async (event) => {
             name: targetUser.name,
             username: targetUser.name,
             email: targetUser.email,
+            role: shareRole,
             avatarUrl: userAvatarUrl(targetUser.id, targetSettings?.avatarPath)
         });
     }

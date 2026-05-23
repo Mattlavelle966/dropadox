@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { folderUserShares, folders } from "~~/server/database/schema";
+import { folderUserShares } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
     enforceRateLimit(event, "folder-user-share-remove", 60, 60_000);
@@ -12,21 +12,22 @@ export default defineEventHandler(async (event) => {
     }
 
     const userPayload = getAuthenticatedUserPayload(event);
-    const ownerId = String(userPayload.id);
+    const currentUserId = String(userPayload.id);
     const db = useDrizzle();
 
-    const folder = await db.select().from(folders)
-        .where(and(eq(folders.id, folderId), eq(folders.userId, ownerId)))
-        .get();
+    const folderAccess = await getFolderAccess(db, String(folderId), currentUserId);
 
-    if (!folder) {
+    if (!folderAccess?.isOwner) {
         throw createError({ statusCode: 404, statusMessage: "Folder not found" });
+    }
+
+    if (targetUserId === String(folderAccess.folder.userId)) {
+        throw createError({ statusCode: 400, statusMessage: "Primary owner cannot be removed" });
     }
 
     await db.delete(folderUserShares)
         .where(and(
             eq(folderUserShares.folderId, String(folderId)),
-            eq(folderUserShares.ownerId, ownerId),
             eq(folderUserShares.sharedWithUserId, targetUserId)
         ));
 

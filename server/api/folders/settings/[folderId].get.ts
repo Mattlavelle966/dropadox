@@ -12,13 +12,13 @@ export default defineEventHandler(async (event) => {
     const userId = String(userPayload.id);
     const db = useDrizzle();
 
-    const folder = await db.select().from(folders)
-        .where(and(eq(folders.id, folderId), eq(folders.userId, userId)))
-        .get();
+    const folderAccess = await getFolderAccess(db, String(folderId), userId);
 
-    if (!folder) {
+    if (!folderAccess?.isOwner) {
         throw createError({ statusCode: 404, statusMessage: "Folder not found" });
     }
+
+    const folder = folderAccess.folder;
 
     const publicShares = await db.select({
         id: folderPublicShares.id,
@@ -26,10 +26,7 @@ export default defineEventHandler(async (event) => {
         expiresAt: folderPublicShares.expiresAt,
         createdAt: folderPublicShares.createdAt
     }).from(folderPublicShares)
-        .where(and(
-            eq(folderPublicShares.folderId, String(folderId)),
-            eq(folderPublicShares.userId, userId)
-        ))
+        .where(eq(folderPublicShares.folderId, String(folderId)))
         .all();
 
     const sharedUsers = await db.select({
@@ -37,15 +34,13 @@ export default defineEventHandler(async (event) => {
         id: users.id,
         name: users.name,
         email: users.email,
+        role: folderUserShares.role,
         avatarPath: userSettings.avatarPath,
         createdAt: folderUserShares.createdAt
     }).from(folderUserShares)
         .innerJoin(users, sql`${folderUserShares.sharedWithUserId} = cast(${users.id} as text)`)
         .leftJoin(userSettings, sql`${userSettings.userID} = cast(${users.id} as text)`)
-        .where(and(
-            eq(folderUserShares.folderId, String(folderId)),
-            eq(folderUserShares.ownerId, userId)
-        ))
+        .where(eq(folderUserShares.folderId, String(folderId)))
         .all();
 
     const publishedShare = await db.select({
@@ -54,10 +49,7 @@ export default defineEventHandler(async (event) => {
         likes: folderPublishedShares.likes,
         createdAt: folderPublishedShares.createdAt
     }).from(folderPublishedShares)
-        .where(and(
-            eq(folderPublishedShares.folderId, String(folderId)),
-            eq(folderPublishedShares.userId, userId)
-        ))
+        .where(eq(folderPublishedShares.folderId, String(folderId)))
         .get();
 
     return {
@@ -76,6 +68,7 @@ export default defineEventHandler(async (event) => {
             name: user.name,
             username: user.name,
             email: user.email,
+            role: user.role ?? "member",
             avatarUrl: userAvatarUrl(user.id, user.avatarPath),
             createdAt: user.createdAt
         }))

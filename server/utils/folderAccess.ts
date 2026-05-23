@@ -10,8 +10,8 @@ export async function getFolderAccess(db: any, folderId: string, userId: string)
         return null;
     }
 
-    const isOwner = folder.userId === userId;
-    const share = isOwner
+    const isPrimaryOwner = folder.userId === userId;
+    const share = isPrimaryOwner
         ? null
         : await db.select().from(folderUserShares)
             .where(and(
@@ -19,10 +19,14 @@ export async function getFolderAccess(db: any, folderId: string, userId: string)
                 eq(folderUserShares.sharedWithUserId, userId)
             ))
             .get();
+    const isCoOwner = share?.role === "owner";
 
     return {
         folder,
-        isOwner,
+        share,
+        isPrimaryOwner,
+        isOwner: isPrimaryOwner || isCoOwner,
+        isCoOwner,
         isSharedWithUser: Boolean(share)
     };
 }

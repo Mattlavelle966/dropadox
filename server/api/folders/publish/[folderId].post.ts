@@ -1,5 +1,5 @@
-import { and, eq } from "drizzle-orm";
-import { folderPublishedShares, folders } from "~~/server/database/schema";
+import { eq } from "drizzle-orm";
+import { folderPublishedShares } from "~~/server/database/schema";
 
 function cleanMarkdown(markdown: unknown) {
     return String(markdown ?? "").trim().slice(0, 4000);
@@ -18,20 +18,15 @@ export default defineEventHandler(async (event) => {
     const userId = String(userPayload.id);
     const db = useDrizzle();
 
-    const folder = await db.select().from(folders)
-        .where(and(eq(folders.id, folderId), eq(folders.userId, userId)))
-        .get();
+    const folderAccess = await getFolderAccess(db, String(folderId), userId);
 
-    if (!folder) {
+    if (!folderAccess?.isOwner) {
         throw createError({ statusCode: 404, statusMessage: "Folder not found" });
     }
 
     const description = cleanMarkdown(markdown);
     let published = await db.select().from(folderPublishedShares)
-        .where(and(
-            eq(folderPublishedShares.folderId, String(folderId)),
-            eq(folderPublishedShares.userId, userId)
-        ))
+        .where(eq(folderPublishedShares.folderId, String(folderId)))
         .get();
 
     if (published) {
@@ -44,7 +39,7 @@ export default defineEventHandler(async (event) => {
         published = await db.insert(folderPublishedShares)
             .values({
                 folderId: String(folderId),
-                userId,
+                userId: String(folderAccess.folder.userId),
                 token: crypto.randomUUID(),
                 markdown: description,
                 likes: 0

@@ -10,13 +10,15 @@ export function publicFolderIconUrl(token: string, hasIcon?: string | null) {
     return hasIcon ? `/api/public/folders/icon/${token}` : null;
 }
 
-export function folderResponse(folder: any, shared = false) {
+export function folderResponse(folder: any, shared = false, accessRole = "owner") {
     return {
         id: folder.id,
         userId: folder.userId,
         name: folder.name,
         createdAt: folder.createdAt,
         shared,
+        accessRole,
+        canManage: accessRole === "owner",
         iconUrl: folderIconUrl(folder.id, folder.iconPath)
     };
 }

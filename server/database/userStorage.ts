@@ -10,6 +10,7 @@ export async function getUserStorageBytes(userId: string) {
     .where(eq(uploads.userId, userId));
 
   let total = 0;
+  const countedPaths = new Set<string>();
 
   for (const upload of userUploads) {
     if (!upload.filePath || !fs.existsSync(upload.filePath)) {
@@ -17,6 +18,11 @@ export async function getUserStorageBytes(userId: string) {
       continue;
     }
 
+    if (countedPaths.has(upload.filePath)) {
+      continue;
+    }
+
+    countedPaths.add(upload.filePath);
     total += upload.size ?? 0;
   }
 

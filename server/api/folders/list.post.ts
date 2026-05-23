@@ -14,7 +14,8 @@ export default defineEventHandler(async (event) => {
         userId: folders.userId,
         name: folders.name,
         iconPath: folders.iconPath,
-        createdAt: folders.createdAt
+        createdAt: folders.createdAt,
+        accessRole: folderUserShares.role
     }).from(folderUserShares)
         .innerJoin(folders, eq(folderUserShares.folderId, folders.id))
         .where(eq(folderUserShares.sharedWithUserId, String(userPayload.id)))
@@ -22,8 +23,8 @@ export default defineEventHandler(async (event) => {
 
     return {
         folders: [
-            ...userFolders.map(folder => folderResponse(folder, false)),
-            ...sharedFolders.map(folder => folderResponse(folder, true))
+            ...userFolders.map(folder => folderResponse(folder, false, "owner")),
+            ...sharedFolders.map(folder => folderResponse(folder, true, folder.accessRole ?? "member"))
         ]
     };
 });

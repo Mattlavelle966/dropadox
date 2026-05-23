@@ -1,4 +1,3 @@
-import fs from "fs";
 import { eq } from "drizzle-orm";
 import { folderPublicShares, folderPublishedShares, folderUserShares, folders, uploads } from "~~/server/database/schema";
 
@@ -19,15 +18,12 @@ export async function deleteFolderWithContents(db: any, folderId: number | strin
         .where(eq(uploads.folderId, String(id)))
         .all();
 
-    for (const upload of folderUploads) {
-        if (upload.filePath && fs.existsSync(upload.filePath)) {
-            fs.unlinkSync(upload.filePath);
-        }
-    }
-
     removeStoredImage(folder.iconPath);
 
-    await db.delete(uploads).where(eq(uploads.folderId, String(id)));
+    for (const upload of folderUploads) {
+        await removeUploadReference(db, upload);
+    }
+
     await db.delete(folderPublicShares).where(eq(folderPublicShares.folderId, String(id)));
     await db.delete(folderPublishedShares).where(eq(folderPublishedShares.folderId, String(id)));
     await db.delete(folderUserShares).where(eq(folderUserShares.folderId, String(id)));

@@ -30,10 +30,13 @@
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
-                        <DropdownMenuItem v-if="!folder.shared" @click="openFolderSettings(folder)">
+                        <DropdownMenuItem v-if="folder.canManage" @click="openFolderSettings(folder)">
                             {{ t('dashboard.folderSettings') }}
                         </DropdownMenuItem>
-                        <DropdownMenuItem v-if="!folder.shared" class="text-red-600 focus:text-red-600" @click="deleteFolder(folder)">
+                        <DropdownMenuItem @click="cloneFolder(folder)">
+                            {{ t('dashboard.cloneFolder') }}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem v-if="folder.canManage" class="text-red-600 focus:text-red-600" @click="deleteFolder(folder)">
                             {{ t('dashboard.deleteFolder') }}
                         </DropdownMenuItem>
                         <DropdownMenuItem v-if="folder.shared" class="text-red-600 focus:text-red-600" @click="leaveFolder(folder)">
@@ -198,12 +201,25 @@
                                     <div class="min-w-0">
                                         <span class="block truncate font-medium">{{ user.name }}</span>
                                         <span class="block truncate opacity-70">{{ user.email }}</span>
+                                        <span class="block text-xs opacity-60">{{ user.role === 'owner' ? t('dashboard.folderOwner') : t('dashboard.folderMember') }}</span>
                                     </div>
                                 </div>
-                                <Button variant="ghost" class="h-8 cursor-pointer text-red-600 hover:text-red-600"
-                                    @click="removeSharedUser(user)">
-                                    {{ t('dashboard.removeUser') }}
-                                </Button>
+                                <div class="flex shrink-0 items-center gap-1">
+                                    <Button v-if="user.role !== 'owner'" variant="ghost"
+                                        class="h-8 cursor-pointer"
+                                        @click="setSharedUserRole(user, 'owner')">
+                                        {{ t('dashboard.makeOwner') }}
+                                    </Button>
+                                    <Button v-else variant="ghost"
+                                        class="h-8 cursor-pointer"
+                                        @click="setSharedUserRole(user, 'member')">
+                                        {{ t('dashboard.makeMember') }}
+                                    </Button>
+                                    <Button variant="ghost" class="h-8 cursor-pointer text-red-600 hover:text-red-600"
+                                        @click="removeSharedUser(user)">
+                                        {{ t('dashboard.removeUser') }}
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                         <p v-else class="text-sm text-zinc-500 dark:text-zinc-400">{{ t('dashboard.noSharedUsers') }}</p>
@@ -239,9 +255,14 @@
                             </button>
                         </div>
 
-                        <Button class="cursor-pointer" :disabled="selectedUsers.length === 0" @click="shareWithSelectedUsers">
-                            {{ t('dashboard.shareSelectedUsers') }}
-                        </Button>
+                        <div class="flex gap-2">
+                            <Button class="cursor-pointer" :disabled="selectedUsers.length === 0" @click="shareWithSelectedUsers('member')">
+                                {{ t('dashboard.shareSelectedUsers') }}
+                            </Button>
+                            <Button variant="ghost" class="cursor-pointer" :disabled="selectedUsers.length === 0" @click="shareWithSelectedUsers('owner')">
+                                {{ t('dashboard.shareAsOwner') }}
+                            </Button>
+                        </div>
 
                     </section>
                 </div>
@@ -274,12 +295,14 @@ const publishedLikes = ref(0)
 const userSearch = ref("")
 const userResults = ref<Array<{ id: number; name: string; email: string; avatarUrl?: string | null }>>([])
 const selectedUsers = ref<Array<{ id: number; name: string; email: string; avatarUrl?: string | null }>>([])
-const sharedUsers = ref<Array<{ id: number; name: string; email: string; avatarUrl?: string | null }>>([])
+const sharedUsers = ref<Array<{ id: number; name: string; email: string; role?: string; avatarUrl?: string | null }>>([])
 
 type FolderItem = {
     id: number;
     name: string;
     shared?: boolean;
+    accessRole?: string;
+    canManage?: boolean;
     iconUrl?: string | null;
 }
 
@@ -358,7 +381,7 @@ async function loadFolderSettings() {
             folder: FolderItem;
             publicShares: Array<{ url: string }>;
             publishedShare: { url: string; markdown: string; likes: number } | null;
-            sharedUsers: Array<{ id: number; name: string; email: string; avatarUrl?: string | null }>;
+            sharedUsers: Array<{ id: number; name: string; email: string; role?: string; avatarUrl?: string | null }>;
         }>(`/api/folders/settings/${settingsFolder.value.id}`);
 
         settingsFolder.value = { ...settingsFolder.value, name: res.folder.name };
@@ -603,7 +626,7 @@ function removeSelectedUser(userId: number) {
     selectedUsers.value = selectedUsers.value.filter((user) => user.id !== userId);
 }
 
-async function shareWithSelectedUsers() {
+async function shareWithSelectedUsers(role: "member" | "owner" = "member") {
     if (!settingsFolder.value) {
         return;
     }
@@ -617,7 +640,8 @@ async function shareWithSelectedUsers() {
         const res = await $fetch<{ users: Array<{ id: number; name: string; email: string; avatarUrl?: string | null }> }>(`/api/folders/share/user/${settingsFolder.value.id}`, {
             method: "POST",
             body: {
-                userIds: selectedUsers.value.map((user) => user.id)
+                userIds: selectedUsers.value.map((user) => user.id),
+                role
             }
         });
 
@@ -626,6 +650,32 @@ async function shareWithSelectedUsers() {
         await loadFolderSettings();
     } catch (err: any) {
         settingsError.value = err?.data?.statusMessage || err?.statusMessage || "Could not share folder";
+    }
+}
+
+async function setSharedUserRole(user: { id: number; email: string }, role: "member" | "owner") {
+    if (!settingsFolder.value) {
+        return;
+    }
+
+    settingsError.value = "";
+    settingsMessage.value = "";
+
+    try {
+        await $fetch(`/api/folders/share/user/${settingsFolder.value.id}`, {
+            method: "POST",
+            body: {
+                userId: user.id,
+                role
+            }
+        });
+
+        settingsMessage.value = role === "owner"
+            ? t('dashboard.userMadeOwner')
+            : t('dashboard.userMadeMember');
+        await loadFolderSettings();
+    } catch (err: any) {
+        settingsError.value = err?.data?.statusMessage || err?.statusMessage || "Could not update user permissions";
     }
 }
 
@@ -669,6 +719,28 @@ async function deleteFolder(folder: FolderItem) {
         emit("folder-deleted", folder.id);
     } catch (err: any) {
         folderError.value = err?.data?.statusMessage || err?.statusMessage || "Could not delete folder";
+    }
+}
+
+async function cloneFolder(folder: FolderItem) {
+    const newName = prompt(t('dashboard.cloneFolderName'), `Copy of ${folder.name}`);
+
+    if (!newName) {
+        return;
+    }
+
+    try {
+        const res = await $fetch<{ folder: FolderItem }>(`/api/folders/clone/${folder.id}`, {
+            method: "POST",
+            body: {
+                name: newName
+            }
+        });
+
+        emit("folder-created", res.folder);
+        emit("select-folder", String(res.folder.id));
+    } catch (err: any) {
+        folderError.value = err?.data?.statusMessage || err?.statusMessage || "Could not duplicate folder";
     }
 }
 

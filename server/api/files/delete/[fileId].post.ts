@@ -1,4 +1,3 @@
-import fs from "fs";
 import { eq } from "drizzle-orm";
 import { uploads } from "~~/server/database/schema";
 
@@ -39,12 +38,7 @@ export default defineEventHandler(async (event) => {
         });
     }
 
-    await db.delete(uploads)
-        .where(eq(uploads.id, fileId));
-
-    if (upload.filePath && fs.existsSync(upload.filePath)) {
-        fs.unlinkSync(upload.filePath);
-    }
+    await removeUploadReference(db, upload);
 
     return { deleted: true, fileId };
 });

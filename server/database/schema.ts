@@ -52,6 +52,7 @@ export const folderUserShares = sqliteTable("folderUserShares", {
     folderId: text("folder_id").references(() => folders.id),
     ownerId: text("owner_id").references(() => users.id),
     sharedWithUserId: text("shared_with_user_id").references(() => users.id),
+    role: text("role").default("member"),
     createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
 })
 

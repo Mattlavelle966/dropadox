@@ -1,5 +1,5 @@
-import { and, eq } from "drizzle-orm";
-import { folderPublishedShares, folders } from "~~/server/database/schema";
+import { eq } from "drizzle-orm";
+import { folderPublishedShares } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
     enforceRateLimit(event, "folder-publish-remove", 30, 60_000);
@@ -13,19 +13,14 @@ export default defineEventHandler(async (event) => {
     const userId = String(userPayload.id);
     const db = useDrizzle();
 
-    const folder = await db.select().from(folders)
-        .where(and(eq(folders.id, folderId), eq(folders.userId, userId)))
-        .get();
+    const folderAccess = await getFolderAccess(db, String(folderId), userId);
 
-    if (!folder) {
+    if (!folderAccess?.isOwner) {
         throw createError({ statusCode: 404, statusMessage: "Folder not found" });
     }
 
     await db.delete(folderPublishedShares)
-        .where(and(
-            eq(folderPublishedShares.folderId, String(folderId)),
-            eq(folderPublishedShares.userId, userId)
-        ));
+        .where(eq(folderPublishedShares.folderId, String(folderId)));
 
     return {
         removed: true,

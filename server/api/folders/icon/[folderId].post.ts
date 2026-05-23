@@ -13,11 +13,9 @@ export default defineEventHandler(async (event) => {
     const userId = String(userPayload.id);
     const db = useDrizzle();
 
-    const folder = await db.select().from(folders)
-        .where(and(eq(folders.id, folderId), eq(folders.userId, userId)))
-        .get();
+    const folderAccess = await getFolderAccess(db, String(folderId), userId);
 
-    if (!folder) {
+    if (!folderAccess?.isOwner) {
         throw createError({ statusCode: 404, statusMessage: "Folder not found" });
     }
 
@@ -26,11 +24,11 @@ export default defineEventHandler(async (event) => {
     try {
         const updatedFolder = await db.update(folders)
             .set({ iconPath: image.filePath })
-            .where(and(eq(folders.id, folderId), eq(folders.userId, userId)))
+            .where(eq(folders.id, folderId))
             .returning()
             .get();
 
-        removeStoredImage(folder.iconPath);
+        removeStoredImage(folderAccess.folder.iconPath);
 
         return {
             folder: {
