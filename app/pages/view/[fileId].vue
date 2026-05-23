@@ -4,25 +4,27 @@
             <DashboardSidebar :folders="folders" :selected-folder-id="selectedFolderId"
                 @select-folder="selectFolder" @folder-created="addFolder" @folder-updated="updateFolder"
                 @folder-deleted="removeFolder">
-                <div class="p-4 bg-white dark:bg-neutral-900/60 rounded-lg shadow-md flex flex-col gap-4 dark:text-white/80">
-                    <h1 class="text-2xl font-bold mb-4">{{t("view.fileDetails.title")}}</h1>
+                <div class="border border-zinc-300 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-950 dark:text-white/80 flex flex-col gap-4">
+                    <h1 class="border-b border-zinc-300 pb-3 text-2xl font-bold dark:border-neutral-700">{{t("view.fileDetails.title")}}</h1>
                     <img v-if="isImage" :src="previewUrl" :alt="upload.fileName"
-                        class="max-h-[60vh] w-full rounded object-contain bg-zinc-100 dark:bg-neutral-950" />
-                    <video v-else-if="isVideo" :src="previewUrl" class="max-h-[60vh] w-full rounded bg-black" controls />
+                        class="max-h-[60vh] w-full object-contain bg-zinc-100 dark:bg-neutral-900" />
+                    <video v-else-if="isVideo" :src="previewUrl" class="max-h-[60vh] w-full bg-black" controls />
                     <audio v-else-if="isAudio" :src="previewUrl" class="w-full" controls />
-                    <iframe v-else-if="isPdf" :src="previewUrl" class="h-[70vh] w-full rounded border border-zinc-200 bg-white [color-scheme:light] dark:border-zinc-200" />
-                    <iframe v-else-if="isHtmlPreview" :src="previewUrl" class="h-[70vh] w-full rounded border border-zinc-200 bg-white [color-scheme:light] dark:border-zinc-200" sandbox />
-                    <p>{{t("view.fileDetails.fileId")}}: {{ upload.id }}</p>
-                    <p>{{t("view.fileDetails.fileSize")}}: {{ upload.size }} bytes</p>
-                    <p>{{t("view.fileDetails.fileName")}}: {{ upload.fileName }}</p>
-                    <p>{{t("view.fileDetails.uploadedAt")}}: {{ new Date(upload.createdAt).toLocaleString() }}</p>
+                    <iframe v-else-if="isPdf" :src="previewUrl" class="h-[70vh] w-full border border-zinc-300 bg-white [color-scheme:light] dark:border-zinc-300" />
+                    <iframe v-else-if="isHtmlPreview" :src="previewUrl" class="h-[70vh] w-full border border-zinc-300 bg-white [color-scheme:light] dark:border-zinc-300" sandbox />
+                    <div class="grid gap-2 border-y border-zinc-300 py-3 text-sm dark:border-neutral-700">
+                        <p>{{t("view.fileDetails.fileId")}}: {{ upload.id }}</p>
+                        <p>{{t("view.fileDetails.fileSize")}}: {{ upload.size }} bytes</p>
+                        <p>{{t("view.fileDetails.fileName")}}: {{ upload.fileName }}</p>
+                        <p>{{t("view.fileDetails.uploadedAt")}}: {{ new Date(upload.createdAt).toLocaleString() }}</p>
+                    </div>
                     <Button @click="download" class="bg-blue-500 hover:bg-blue-400 cursor-pointer hover:scale-[101%]"
                         :disabled="downloading">
                         <Download />
                         {{t("common.words.download")}}
                     </Button>
                     <p v-if="downloadMessage"
-                        class="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-700 dark:bg-blue-950/40 dark:text-blue-200">
+                        class="border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
                         {{ downloadMessage }}
                     </p>
                 </div>

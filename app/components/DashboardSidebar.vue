@@ -49,6 +49,20 @@
             </Button>
         </nav>
 
+        <NuxtLink v-if="isLoggedIn" to="/settings"
+            class="flex min-w-0 items-center gap-3 border border-zinc-400/40 bg-zinc-200/60 p-3 text-left text-xs text-zinc-700 transition hover:bg-zinc-200 dark:border-neutral-700 dark:bg-neutral-800/70 dark:text-zinc-300 dark:hover:bg-neutral-800">
+            <img v-if="showAvatar" :src="avatarUrl" :alt="session?.username"
+                class="h-9 w-9 shrink-0 rounded-none object-cover" @error="showAvatar = false" />
+            <span v-else
+                class="flex h-9 w-9 shrink-0 items-center justify-center bg-zinc-300 text-xs font-bold text-zinc-700 dark:bg-neutral-700 dark:text-white">
+                <User class="h-4 w-4" />
+            </span>
+            <span class="min-w-0">
+                <span class="block truncate font-semibold text-zinc-900 dark:text-white">{{ session?.username }}</span>
+                <span class="block truncate opacity-70">{{ session?.emailAddress }}</span>
+            </span>
+        </NuxtLink>
+
         <button type="button"
             class="mt-auto flex flex-col gap-2 border border-zinc-400/40 bg-zinc-200/60 p-3 text-left text-xs text-zinc-700 transition hover:bg-zinc-200 dark:border-neutral-700 dark:bg-neutral-800/70 dark:text-zinc-300 dark:hover:bg-neutral-800"
             @click="openStorageDialog">
@@ -294,8 +308,8 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, ref, watch } from 'vue';
-import { Folder, ChevronDown, X, Settings, Shield, LogOut, HardDrive } from "lucide-vue-next";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { Folder, ChevronDown, X, Settings, Shield, LogOut, HardDrive, User } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -307,6 +321,9 @@ const { data: session } = await useFetch("/api/verifyToken", {
 });
 const isLoggedIn = computed(() => Boolean(session.value?.authenticated && session.value?.id));
 const isAdmin = computed(() => session.value?.role === "admin");
+const avatarVersion = ref(Date.now());
+const showAvatar = ref(true);
+const avatarUrl = computed(() => isLoggedIn.value ? `/api/users/avatar/${session.value?.id}?v=${avatarVersion.value}` : "");
 const showUploadFile = ref(false)
 const showCreateFolder = ref(false)
 const showFolderSettings = ref(false)
@@ -374,10 +391,20 @@ watch(showStorageDialog, (open) => {
 
 onMounted(() => {
     refreshStorage();
+    window.addEventListener("user-avatar-updated", refreshAvatar);
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener("user-avatar-updated", refreshAvatar);
 });
 
 function initials(value = "") {
     return value.trim().slice(0, 2).toUpperCase() || "??";
+}
+
+function refreshAvatar() {
+    showAvatar.value = true;
+    avatarVersion.value = Date.now();
 }
 
 function formatBytes(bytes: number) {

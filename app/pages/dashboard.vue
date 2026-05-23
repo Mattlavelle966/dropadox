@@ -67,18 +67,20 @@
             </Button>
           </div>
 
-          <section class="min-w-0 border border-zinc-300 bg-white dark:border-neutral-700 dark:bg-neutral-950">
-            <div class="dashboard-table-row grid border-b border-zinc-300 bg-zinc-200/70 px-3 py-2 text-xs font-semibold uppercase text-zinc-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-zinc-300">
-              <span>{{ t('dashboard.columnName') }}</span>
-              <span>{{ t('dashboard.columnType') }}</span>
-              <span class="people-col">{{ t('dashboard.columnPeople') }}</span>
-              <span class="size-col">{{ t('dashboard.columnSize') }}</span>
-              <span class="date-col">{{ t('dashboard.columnDate') }}</span>
-              <span class="text-right">{{ t('dashboard.columnActions') }}</span>
+          <section class="min-w-0 overflow-x-auto border border-zinc-300 bg-white dark:border-neutral-700 dark:bg-neutral-950">
+            <div class="dashboard-table-row grid border-b border-zinc-300 bg-zinc-200/70 px-3 py-2 text-xs font-semibold uppercase text-zinc-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-zinc-300"
+              :style="tableGridStyle">
+              <span class="resizable-header">{{ t('dashboard.columnName') }}<span class="column-resizer" @pointerdown="startColumnResize('name', $event)"></span></span>
+              <span class="resizable-header">{{ t('dashboard.columnType') }}<span class="column-resizer" @pointerdown="startColumnResize('type', $event)"></span></span>
+              <span class="people-col resizable-header">{{ t('dashboard.columnPeople') }}<span class="column-resizer" @pointerdown="startColumnResize('people', $event)"></span></span>
+              <span class="size-col resizable-header">{{ t('dashboard.columnSize') }}<span class="column-resizer" @pointerdown="startColumnResize('size', $event)"></span></span>
+              <span class="date-col resizable-header">{{ t('dashboard.columnDate') }}<span class="column-resizer" @pointerdown="startColumnResize('date', $event)"></span></span>
+              <span class="resizable-header text-right">{{ t('dashboard.columnActions') }}<span class="column-resizer" @pointerdown="startColumnResize('actions', $event)"></span></span>
             </div>
 
             <div v-for="item in tableRows" :key="item.key"
               class="dashboard-table-row grid items-center border-b border-zinc-200 px-3 py-2 text-sm last:border-b-0 hover:bg-zinc-100 dark:border-neutral-800 dark:hover:bg-neutral-900/80"
+              :style="tableGridStyle"
               @mouseenter="item.kind === 'file' && openFilePreview(item.file, $event)"
               @mousemove="item.kind === 'file' && moveFilePreview($event)"
               @mouseleave="scheduleHidePreview">
@@ -295,7 +297,20 @@ const moveKind = ref<"file" | "folder" | null>(null);
 const moveItem = ref<any | null>(null);
 const moveTargetFolderId = ref("");
 const moveError = ref("");
+const tableColumnWidths = ref({
+  name: 320,
+  type: 112,
+  people: 180,
+  size: 96,
+  date: 160,
+  actions: 132
+});
 let hidePreviewTimeout: ReturnType<typeof setTimeout> | null = null;
+let resizingColumn: {
+  key: keyof typeof tableColumnWidths.value;
+  startX: number;
+  startWidth: number;
+} | null = null;
 
 const filteredUploads = computed(() => {
   if (!searchQuery.value) return userUploads.value;
@@ -303,6 +318,14 @@ const filteredUploads = computed(() => {
     (file.fileName ?? '').toLowerCase().includes(searchQuery.value.toLowerCase())
   );
 });
+const tableGridStyle = computed(() => ({
+  "--name-col": `${tableColumnWidths.value.name}px`,
+  "--type-col": `${tableColumnWidths.value.type}px`,
+  "--people-col": `${tableColumnWidths.value.people}px`,
+  "--size-col": `${tableColumnWidths.value.size}px`,
+  "--date-col": `${tableColumnWidths.value.date}px`,
+  "--actions-col": `${tableColumnWidths.value.actions}px`
+}));
 const selectedFolder = computed(() => {
   if (!selectedFolderId.value) return null;
   return folders.value.find(folder => String(folder.id) === selectedFolderId.value) ?? null;
@@ -401,6 +424,69 @@ const breadcrumbFolders = computed(() => {
 
 function removeUpload(fileId: number) {
   userUploads.value = userUploads.value.filter(file => file.id !== fileId);
+}
+
+function loadColumnWidths() {
+  if (!import.meta.client) {
+    return;
+  }
+
+  try {
+    const stored = window.localStorage.getItem("dashboard-table-column-widths");
+
+    if (!stored) {
+      return;
+    }
+
+    tableColumnWidths.value = {
+      ...tableColumnWidths.value,
+      ...JSON.parse(stored)
+    };
+  } catch {
+    window.localStorage.removeItem("dashboard-table-column-widths");
+  }
+}
+
+function saveColumnWidths() {
+  if (import.meta.client) {
+    window.localStorage.setItem("dashboard-table-column-widths", JSON.stringify(tableColumnWidths.value));
+  }
+}
+
+function startColumnResize(key: keyof typeof tableColumnWidths.value, event: PointerEvent) {
+  resizingColumn = {
+    key,
+    startX: event.clientX,
+    startWidth: tableColumnWidths.value[key]
+  };
+  window.addEventListener("pointermove", resizeColumn);
+  window.addEventListener("pointerup", stopColumnResize, { once: true });
+}
+
+function resizeColumn(event: PointerEvent) {
+  if (!resizingColumn) {
+    return;
+  }
+
+  const minimums = {
+    name: 200,
+    type: 84,
+    people: 128,
+    size: 76,
+    date: 116,
+    actions: 104
+  };
+  const nextWidth = Math.max(minimums[resizingColumn.key], resizingColumn.startWidth + event.clientX - resizingColumn.startX);
+  tableColumnWidths.value = {
+    ...tableColumnWidths.value,
+    [resizingColumn.key]: Math.round(nextWidth)
+  };
+}
+
+function stopColumnResize() {
+  saveColumnWidths();
+  window.removeEventListener("pointermove", resizeColumn);
+  resizingColumn = null;
 }
 
 function initials(value = "") {
@@ -727,6 +813,7 @@ function onVisibilityChange() {
 }
 
 onMounted(() => {
+  loadColumnWidths();
   dashboardRefreshTimer = window.setInterval(() => {
     if (document.visibilityState === "visible") {
       refreshDashboard();
@@ -739,6 +826,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   cancelHidePreview();
+  window.removeEventListener("pointermove", resizeColumn);
+  window.removeEventListener("pointerup", stopColumnResize);
   if (dashboardRefreshTimer) {
     window.clearInterval(dashboardRefreshTimer);
   }
@@ -754,13 +843,38 @@ useHead({
 
 <style scoped>
 .dashboard-table-row {
-  grid-template-columns: minmax(0, 1fr) minmax(4.75rem, 0.28fr) minmax(8rem, 0.45fr) minmax(4.5rem, 0.22fr) minmax(8rem, 0.36fr) 7.75rem;
+  grid-template-columns: var(--name-col, 320px) var(--type-col, 112px) var(--people-col, 180px) var(--size-col, 96px) var(--date-col, 160px) var(--actions-col, 132px);
   column-gap: 0.75rem;
+  min-width: max-content;
+}
+
+.resizable-header {
+  position: relative;
+  min-width: 0;
+  padding-right: 0.5rem;
+}
+
+.column-resizer {
+  bottom: -0.5rem;
+  cursor: col-resize;
+  position: absolute;
+  right: -0.375rem;
+  top: -0.5rem;
+  width: 0.75rem;
+}
+
+.column-resizer::after {
+  background: rgb(161 161 170 / 0.75);
+  content: "";
+  display: block;
+  height: 100%;
+  margin-inline: auto;
+  width: 1px;
 }
 
 @media (max-width: 900px) {
   .dashboard-table-row {
-    grid-template-columns: minmax(0, 1fr) minmax(4.5rem, 0.24fr) minmax(7rem, 0.32fr) minmax(4.25rem, 0.2fr) 7.25rem;
+    grid-template-columns: var(--name-col, 320px) var(--type-col, 112px) var(--people-col, 180px) var(--size-col, 96px) var(--actions-col, 132px);
   }
 
   .date-col {
