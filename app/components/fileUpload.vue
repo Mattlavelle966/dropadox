@@ -1,27 +1,27 @@
 <template>
-  <div>
+  <div class="upload-root">
     <label
-      class="flex h-36 w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-zinc-300 px-4 text-center transition hover:bg-zinc-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+      class="upload-dropzone flex h-36 w-full cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-zinc-300 px-4 text-center transition hover:bg-zinc-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
       :class="{ 'border-blue-500 bg-blue-50 dark:bg-blue-950/30': dragging }"
       @dragenter.prevent="dragging = true"
       @dragover.prevent="dragging = true"
       @dragleave.prevent="dragging = false"
       @drop.prevent="onDrop">
       <UploadCloud class="mb-2 h-7 w-7 text-zinc-500 dark:text-zinc-400" />
-      <p class="text-sm font-medium text-zinc-700 dark:text-zinc-200">
+      <p class="max-w-full text-sm font-medium text-zinc-700 dark:text-zinc-200">
         {{ uploadItems.length ? t('dashboard.uploadFilesSelected', { count: uploadItems.length }) : t('dashboard.uploadFileModalDescription') }}
       </p>
-      <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+      <p class="mt-1 max-w-full text-xs text-zinc-500 dark:text-zinc-400">
         {{ t('dashboard.uploadDropHint') }}
       </p>
       <input type="file" multiple class="hidden" @change="onFileChange" />
     </label>
 
-    <div v-if="uploadItems.length" class="mt-3 max-h-44 space-y-2 overflow-y-auto rounded-md border border-zinc-200 p-2 dark:border-neutral-700">
-      <div v-for="item in uploadItems" :key="item.id" class="flex items-center gap-3 text-sm">
+    <div v-if="uploadItems.length" class="upload-list mt-3 max-h-44 space-y-2 overflow-y-auto rounded-md border border-zinc-200 p-2 dark:border-neutral-700">
+      <div v-for="item in uploadItems" :key="item.id" class="upload-file-row flex items-center gap-3 text-sm">
         <div class="min-w-0 flex-1">
-          <div class="flex items-center justify-between gap-2">
-            <span class="truncate text-zinc-800 dark:text-zinc-100">{{ item.file.name }}</span>
+          <div class="flex min-w-0 items-center justify-between gap-2">
+            <span class="upload-file-name text-zinc-800 dark:text-zinc-100">{{ item.file.name }}</span>
             <span class="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
               {{ fileStatusLabel(item) }}
             </span>
@@ -37,7 +37,7 @@
       </div>
     </div>
 
-    <div class="mt-2 flex gap-2">
+    <div class="upload-actions mt-2 flex gap-2">
       <Button class="flex-1 bg-zinc-300 font-medium text-zinc-800 hover:bg-zinc-400" :disabled="pendingUploadCount === 0 || uploading"
       @click="upload">
         {{ uploading ? t('dashboard.uploadingFiles', { count: activeUploadCount, progress: uploadProgress }) : t('dashboard.uploadFileModalButton') }}
@@ -307,3 +307,51 @@ async function upload() {
   }
 }
 </script>
+
+<style scoped>
+.upload-root {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.upload-dropzone,
+.upload-list,
+.upload-file-row {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.upload-list {
+  overflow-x: hidden;
+}
+
+.upload-file-name {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .upload-dropzone {
+    height: 8rem;
+    padding-inline: 0.75rem;
+  }
+
+  .upload-file-row {
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .upload-actions {
+    flex-direction: column;
+  }
+
+  .upload-actions :deep(button) {
+    width: 100%;
+  }
+}
+</style>
