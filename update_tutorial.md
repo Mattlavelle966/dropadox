@@ -64,6 +64,13 @@ sqlite3 local.db "PRAGMA table_info(folderUserShares);"
 
 Compare the output with the migration files in `server/database/migrations`. If the column/table already exists and the app was previously updated manually, keep the backup and repair the migration history only after confirming which migration was already applied.
 
+For versions that predate per-user storage limits, make sure `users` has `storage_max_bytes`. If migration history is missing but the older tables already exist, apply this one schema change after backing up:
+
+```sql
+ALTER TABLE users ADD COLUMN storage_max_bytes integer DEFAULT 13000000000 NOT NULL;
+UPDATE users SET storage_max_bytes = 13000000000 WHERE storage_max_bytes IS NULL OR storage_max_bytes <= 0;
+```
+
 When in doubt, restore the backup and ask a maintainer to review the exact migration error.
 
 ## 6. Build and smoke test

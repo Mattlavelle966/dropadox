@@ -1,13 +1,28 @@
 <template>
-    <aside class="w-56 shrink-0 bg-zinc-300 dark:bg-neutral-900 dark:text-white flex flex-col p-3 space-y-4">
+    <aside class="shrink-0 bg-zinc-300 dark:bg-neutral-900 dark:text-white flex flex-col p-3 space-y-4 transition-[width]"
+        :class="sidebarCollapsed ? 'w-16' : 'w-56'">
+        <div class="flex items-center justify-between gap-2">
+            <span v-if="!sidebarCollapsed" class="truncate text-sm font-semibold">{{ t('common.siteName') }}</span>
+            <Button variant="ghost" class="h-9 w-9 shrink-0 rounded-none px-0 cursor-pointer"
+                :title="sidebarCollapsed ? t('dashboard.expandSidebar') : t('dashboard.collapseSidebar')"
+                @click="toggleSidebar">
+                <PanelLeftOpen v-if="sidebarCollapsed" class="h-4 w-4" />
+                <PanelLeftClose v-else class="h-4 w-4" />
+            </Button>
+        </div>
+
         <div class="flex flex-col gap-2">
-            <Input v-model="search" :placeholder="t('dashboard.searchFiles')"
+            <Input v-if="!sidebarCollapsed" v-model="search" :placeholder="t('dashboard.searchFiles')"
                 class="rounded-none border-zinc-300 bg-white dark:bg-neutral-800 dark:focus-visible:ring-neutral-300 focus-visible:ring-zinc-300" />
 
             <DropdownMenu>
                 <DropdownMenuTrigger as-child>
-                    <Button class="w-full cursor-pointer justify-between rounded-none" variant="default">{{ t('common.words.new') }}
-                        <ChevronDown class="h-4 w-4" />
+                    <Button class="w-full cursor-pointer rounded-none" :class="sidebarCollapsed ? 'justify-center px-0' : 'justify-between'" variant="default">
+                        <FolderPlus v-if="sidebarCollapsed" class="h-4 w-4" />
+                        <template v-else>
+                            {{ t('common.words.new') }}
+                            <ChevronDown class="h-4 w-4" />
+                        </template>
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
@@ -20,63 +35,98 @@
         <nav class="flex flex-col gap-2">
             <Button variant="ghost" class="justify-start rounded-none hover:bg-zinc-400/30 cursor-pointer"
                 @click="emit('select-folder', null)"
-                :class="{ 'bg-zinc-400/30': props.selectedFolderId === null }">
-                <Folder class="w-4 h-4 mr-2" />
-                {{ t('dashboard.myFiles') }}
+                :title="t('dashboard.myFiles')"
+                :class="[{ 'bg-zinc-400/30': props.selectedFolderId === null }, sidebarCollapsed ? 'w-full justify-center px-0' : '']">
+                <Folder class="w-4 h-4" :class="{ 'mr-2': !sidebarCollapsed }" />
+                <span v-if="!sidebarCollapsed">{{ t('dashboard.myFiles') }}</span>
             </Button>
             <NuxtLink to="/settings">
-                <Button variant="ghost" class="w-full justify-start rounded-none hover:bg-zinc-400/30 cursor-pointer">
-                    <Settings class="w-4 h-4 mr-2" />
-                    {{ t('common.nav.settings') }}
+                <Button variant="ghost" class="w-full rounded-none hover:bg-zinc-400/30 cursor-pointer"
+                    :title="t('common.nav.settings')"
+                    :class="sidebarCollapsed ? 'justify-center px-0' : 'justify-start'">
+                    <Settings class="w-4 h-4" :class="{ 'mr-2': !sidebarCollapsed }" />
+                    <span v-if="!sidebarCollapsed">{{ t('common.nav.settings') }}</span>
                 </Button>
             </NuxtLink>
-            <Button variant="ghost" class="w-full justify-start rounded-none hover:bg-zinc-400/30 cursor-pointer"
+            <Button variant="ghost" class="w-full rounded-none hover:bg-zinc-400/30 cursor-pointer"
+                :class="sidebarCollapsed ? 'justify-center px-0' : 'justify-start'"
+                :title="t('dashboard.storage')"
                 @click="openStorageDialog">
-                <HardDrive class="w-4 h-4 mr-2" />
-                {{ t('dashboard.storage') }}
+                <HardDrive class="w-4 h-4" :class="{ 'mr-2': !sidebarCollapsed }" />
+                <span v-if="!sidebarCollapsed">{{ t('dashboard.storage') }}</span>
             </Button>
             <NuxtLink v-if="isAdmin" to="/admin">
-                <Button variant="ghost" class="w-full justify-start rounded-none hover:bg-zinc-400/30 cursor-pointer">
-                    <Shield class="w-4 h-4 mr-2" />
-                    {{ t('common.nav.admin') }}
+                <Button variant="ghost" class="w-full rounded-none hover:bg-zinc-400/30 cursor-pointer"
+                    :title="t('common.nav.admin')"
+                    :class="sidebarCollapsed ? 'justify-center px-0' : 'justify-start'">
+                    <Shield class="w-4 h-4" :class="{ 'mr-2': !sidebarCollapsed }" />
+                    <span v-if="!sidebarCollapsed">{{ t('common.nav.admin') }}</span>
                 </Button>
             </NuxtLink>
             <Button v-if="isLoggedIn" variant="ghost"
-                class="justify-start rounded-none text-red-600 hover:bg-red-500/10 hover:text-red-600 cursor-pointer"
+                class="rounded-none text-red-600 hover:bg-red-500/10 hover:text-red-600 cursor-pointer"
+                :title="t('common.nav.logOut')"
+                :class="sidebarCollapsed ? 'w-full justify-center px-0' : 'justify-start'"
                 @click="logoff">
-                <LogOut class="w-4 h-4 mr-2" />
-                {{ t('common.nav.logOut') }}
+                <LogOut class="w-4 h-4" :class="{ 'mr-2': !sidebarCollapsed }" />
+                <span v-if="!sidebarCollapsed">{{ t('common.nav.logOut') }}</span>
             </Button>
         </nav>
 
         <NuxtLink v-if="isLoggedIn" to="/settings"
-            class="flex min-w-0 items-center gap-3 border border-zinc-400/40 bg-zinc-200/60 p-3 text-left text-xs text-zinc-700 transition hover:bg-zinc-200 dark:border-neutral-700 dark:bg-neutral-800/70 dark:text-zinc-300 dark:hover:bg-neutral-800">
+            class="flex min-w-0 items-center border border-zinc-400/40 bg-zinc-200/60 text-left text-xs text-zinc-700 transition hover:bg-zinc-200 dark:border-neutral-700 dark:bg-neutral-800/70 dark:text-zinc-300 dark:hover:bg-neutral-800"
+            :class="sidebarCollapsed ? 'justify-center p-2' : 'gap-3 p-3'">
             <img v-if="showAvatar" :src="avatarUrl" :alt="session?.username"
                 class="h-9 w-9 shrink-0 rounded-none object-cover" @error="showAvatar = false" />
             <span v-else
                 class="flex h-9 w-9 shrink-0 items-center justify-center bg-zinc-300 text-xs font-bold text-zinc-700 dark:bg-neutral-700 dark:text-white">
                 <User class="h-4 w-4" />
             </span>
-            <span class="min-w-0">
+            <span v-if="!sidebarCollapsed" class="min-w-0">
                 <span class="block truncate font-semibold text-zinc-900 dark:text-white">{{ session?.username }}</span>
                 <span class="block truncate opacity-70">{{ session?.emailAddress }}</span>
             </span>
         </NuxtLink>
 
-        <button type="button"
-            class="mt-auto flex flex-col gap-2 border border-zinc-400/40 bg-zinc-200/60 p-3 text-left text-xs text-zinc-700 transition hover:bg-zinc-200 dark:border-neutral-700 dark:bg-neutral-800/70 dark:text-zinc-300 dark:hover:bg-neutral-800"
-            @click="openStorageDialog">
-            <div class="flex w-full items-center justify-between gap-2">
-                <span class="font-medium text-zinc-900 dark:text-white">{{ t('dashboard.storage') }}</span>
-                <span>{{ storagePercentLabel }}</span>
-            </div>
-            <div class="h-1.5 w-full overflow-hidden bg-zinc-400/40 dark:bg-neutral-700">
-                <div class="h-full bg-blue-500 transition-[width]" :style="{ width: `${storagePercent}%` }"></div>
-            </div>
-            <span>{{ t('dashboard.storageRemaining', { remaining: storageRemainingLabel }) }}</span>
-        </button>
+        <div class="mt-auto flex flex-col gap-2">
+            <button type="button"
+                class="flex border border-zinc-400/40 bg-zinc-200/60 text-left text-xs text-zinc-700 transition hover:bg-zinc-200 dark:border-neutral-700 dark:bg-neutral-800/70 dark:text-zinc-300 dark:hover:bg-neutral-800"
+                :class="sidebarCollapsed ? 'h-10 items-center justify-center p-0' : 'flex-col gap-2 p-3'"
+                :title="`${t('dashboard.storage')}: ${storageUsedLabel}`"
+                @click="openStorageDialog">
+                <HardDrive v-if="sidebarCollapsed" class="h-4 w-4" />
+                <template v-else>
+                    <div class="flex w-full items-center justify-between gap-2">
+                        <span class="font-medium text-zinc-900 dark:text-white">{{ t('dashboard.totalStorage') }}</span>
+                        <span>{{ storagePercentLabel }}</span>
+                    </div>
+                    <div class="h-1.5 w-full overflow-hidden bg-zinc-400/40 dark:bg-neutral-700">
+                        <div class="h-full bg-blue-500 transition-[width]" :style="{ width: `${storagePercent}%` }"></div>
+                    </div>
+                    <span>{{ t('dashboard.storageRemaining', { remaining: storageRemainingLabel }) }}</span>
+                </template>
+            </button>
 
-        <div class="text-sm text-black/80 dark:text-white/50">
+            <button v-for="share in sharedStorageBoxes" :key="share.id" type="button"
+                class="flex border border-zinc-400/40 bg-zinc-200/60 text-left text-xs text-zinc-700 transition hover:bg-zinc-200 dark:border-neutral-700 dark:bg-neutral-800/70 dark:text-zinc-300 dark:hover:bg-neutral-800"
+                :class="sidebarCollapsed ? 'h-10 items-center justify-center p-0' : 'flex-col gap-2 p-3'"
+                :title="`${share.name}: ${share.usedLabel}`"
+                @click="openStorageDialog">
+                <Folder v-if="sidebarCollapsed" class="h-4 w-4" />
+                <template v-else>
+                    <div class="flex w-full items-center justify-between gap-2">
+                        <span class="truncate font-medium text-zinc-900 dark:text-white">{{ share.name }}</span>
+                        <span class="shrink-0">{{ share.percent.toFixed(share.percent % 1 === 0 ? 0 : 1) }}%</span>
+                    </div>
+                    <div class="h-1.5 w-full overflow-hidden bg-zinc-400/40 dark:bg-neutral-700">
+                        <div class="h-full bg-emerald-500" :style="{ width: `${share.percent}%` }"></div>
+                    </div>
+                    <span class="truncate">{{ share.usedLabel }} / {{ share.maxLabel }}</span>
+                </template>
+            </button>
+        </div>
+
+        <div v-if="!sidebarCollapsed" class="text-sm text-black/80 dark:text-white/50">
             © {{ new Date().getFullYear() }} {{ t('common.siteName') }}
         </div>
     </aside>
@@ -119,6 +169,22 @@
                     <Button variant="ghost" class="cursor-pointer justify-start" @click="refreshStorage">
                         {{ t('dashboard.refreshStorage') }}
                     </Button>
+                    <section v-if="sharedStorageBoxes.length" class="flex flex-col gap-2">
+                        <h3 class="text-sm font-semibold">{{ t('dashboard.sharedStorage') }}</h3>
+                        <div v-for="share in sharedStorageBoxes" :key="share.id"
+                            class="border border-zinc-300 p-3 text-sm dark:border-neutral-700">
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="min-w-0 truncate font-medium">{{ share.name }}</span>
+                                <span class="shrink-0">{{ share.usedLabel }} / {{ share.maxLabel }}</span>
+                            </div>
+                            <div class="mt-2 h-2 w-full overflow-hidden bg-zinc-200 dark:bg-neutral-800">
+                                <div class="h-full bg-emerald-500" :style="{ width: `${share.percent}%` }"></div>
+                            </div>
+                            <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                                {{ t('dashboard.sharedStorageRole', { role: share.roleLabel }) }}
+                            </p>
+                        </div>
+                    </section>
                 </div>
             </DialogContent>
         </Dialog>
@@ -309,7 +375,7 @@
 
 <script lang="ts" setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { Folder, ChevronDown, X, Settings, Shield, LogOut, HardDrive, User } from "lucide-vue-next";
+import { Folder, FolderPlus, ChevronDown, X, Settings, Shield, LogOut, HardDrive, User, PanelLeftClose, PanelLeftOpen } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -342,7 +408,14 @@ const userSearch = ref("")
 const userResults = ref<Array<{ id: number; name: string; email: string; avatarUrl?: string | null }>>([])
 const selectedUsers = ref<Array<{ id: number; name: string; email: string; avatarUrl?: string | null }>>([])
 const sharedUsers = ref<Array<{ id: number; name: string; email: string; role?: string; avatarUrl?: string | null }>>([])
-const storage = ref({ usedBytes: 0, maxBytes: 0, remainingBytes: 0, usedPercent: 0 })
+const sidebarCollapsed = ref(false)
+const storage = ref<{
+    usedBytes: number;
+    maxBytes: number;
+    remainingBytes: number;
+    usedPercent: number;
+    sharedFolders: Array<{ id: number; name: string; role?: string; usedBytes: number; maxBytes: number; usedPercent: number }>;
+}>({ usedBytes: 0, maxBytes: 0, remainingBytes: 0, usedPercent: 0, sharedFolders: [] })
 const storageError = ref("")
 
 type FolderItem = {
@@ -374,6 +447,13 @@ const storagePercentLabel = computed(() => `${storagePercent.value.toFixed(stora
 const storageUsedLabel = computed(() => formatBytes(storage.value.usedBytes));
 const storageMaxLabel = computed(() => formatBytes(storage.value.maxBytes));
 const storageRemainingLabel = computed(() => formatBytes(storage.value.remainingBytes));
+const sharedStorageBoxes = computed(() => storage.value.sharedFolders.map(folder => ({
+    ...folder,
+    usedLabel: formatBytes(folder.usedBytes),
+    maxLabel: formatBytes(folder.maxBytes),
+    roleLabel: folder.role === "owner" ? t('dashboard.folderOwner') : t('dashboard.folderMember'),
+    percent: Math.min(100, Math.max(0, folder.usedPercent || 0))
+})));
 
 // Keep v-model in sync
 watch(search, (val: string) => emit("update:search", val));
@@ -390,6 +470,7 @@ watch(showStorageDialog, (open) => {
 });
 
 onMounted(() => {
+    loadSidebarState();
     refreshStorage();
     window.addEventListener("user-avatar-updated", refreshAvatar);
 });
@@ -405,6 +486,24 @@ function initials(value = "") {
 function refreshAvatar() {
     showAvatar.value = true;
     avatarVersion.value = Date.now();
+}
+
+function loadSidebarState() {
+    try {
+        sidebarCollapsed.value = window.localStorage.getItem("dashboard-sidebar-collapsed") === "true";
+    } catch {
+        sidebarCollapsed.value = false;
+    }
+}
+
+function toggleSidebar() {
+    sidebarCollapsed.value = !sidebarCollapsed.value;
+
+    try {
+        window.localStorage.setItem("dashboard-sidebar-collapsed", String(sidebarCollapsed.value));
+    } catch {
+        // Local storage can be unavailable in privacy modes.
+    }
 }
 
 function formatBytes(bytes: number) {
@@ -429,7 +528,14 @@ async function refreshStorage() {
     storageError.value = "";
 
     try {
-        storage.value = await $fetch<typeof storage.value>("/api/storage");
+        const nextStorage = await $fetch<Partial<typeof storage.value>>("/api/storage");
+        storage.value = {
+            usedBytes: nextStorage.usedBytes ?? 0,
+            maxBytes: nextStorage.maxBytes ?? 0,
+            remainingBytes: nextStorage.remainingBytes ?? 0,
+            usedPercent: nextStorage.usedPercent ?? 0,
+            sharedFolders: nextStorage.sharedFolders ?? []
+        };
     } catch (err: any) {
         storageError.value = err?.data?.statusMessage || err?.statusMessage || "Could not load storage";
     }

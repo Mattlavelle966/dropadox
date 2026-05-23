@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `storage_max_bytes` integer DEFAULT 13000000000 NOT NULL;

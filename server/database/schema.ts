@@ -7,6 +7,7 @@ export const users = sqliteTable("users", {
     password: text("password").notNull(),
     email: text("email").notNull(),
     role: text("role").notNull().default("user"),
+    storageMaxBytes: int("storage_max_bytes").notNull().default(13_000_000_000),
     createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
 })
 

@@ -57,6 +57,20 @@
       "when": 1779533400000,
       "tag": "0007_folder_share_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1779540000000,
+      "tag": "0008_nested_folders_and_ip_blacklist",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1779541200000,
+      "tag": "0009_user_storage_capacity",
+      "breakpoints": true
     }
   ]
 }

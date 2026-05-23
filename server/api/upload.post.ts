@@ -4,7 +4,7 @@ import path from "path";
 import { uploads } from "../database/schema";
 import { getUserStorageBytes } from "../database/userStorage";
 import { getUploadDir, safeFileName } from "../utils/fileStorage";
-import { getMaxUserStorageBytes } from "../utils/storageQuota";
+import { getUserStorageMaxBytes } from "../utils/storageQuota";
 
 type ParsedUpload = {
     filename?: string;
@@ -107,8 +107,10 @@ export default defineEventHandler(async (event) => {
     try {
         enforceRateLimit(event, "upload", 20, 60_000);
         const userPayload = getAuthenticatedUserPayload(event);
-        const maxBytes = getMaxUserStorageBytes();
-        const usedBytes = await getUserStorageBytes(String(userPayload.id));
+        const db = useDrizzle();
+        const userId = String(userPayload.id);
+        const maxBytes = await getUserStorageMaxBytes(db, userId);
+        const usedBytes = await getUserStorageBytes(userId);
         const remainingBytes = maxBytes - usedBytes;
 
         if (remainingBytes <= 0) {
@@ -136,8 +138,6 @@ export default defineEventHandler(async (event) => {
             });
         }
 
-        const db = useDrizzle();
-        const userId = String(userPayload.id);
         const folderId = parsed.folderId ? String(parsed.folderId) : null;
 
         if (folderId) {
