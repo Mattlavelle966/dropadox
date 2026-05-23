@@ -22,6 +22,41 @@
       "when": 1779463500000,
       "tag": "0002_folder_shares",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1779464100000,
+      "tag": "0003_public_share_expiry",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1779496000000,
+      "tag": "0004_user_search_visibility",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1779497200000,
+      "tag": "0005_user_and_folder_images",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1779498200000,
+      "tag": "0006_publish_and_admin",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1779533400000,
+      "tag": "0007_folder_share_roles",
+      "breakpoints": true
     }
   ]
 }

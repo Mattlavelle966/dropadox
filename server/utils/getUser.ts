@@ -5,7 +5,9 @@ import { eq } from 'drizzle-orm';
 import { User } from './useDrizzle';
 
 export function getUserPayload(token: string): UserPayload {
-    const userPayload = jwt.verify(token, process.env.JSON_SECRET_KEY!);
+    const userPayload = jwt.verify(token, process.env.JSON_SECRET_KEY!, {
+        algorithms: ["HS256"]
+    });
 
     return userPayload as UserPayload;
 }

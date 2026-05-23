@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
-import { folderPublicShares, folders, uploads } from "~~/server/database/schema";
+import { folders, uploads } from "~~/server/database/schema";
+import { getStoredFileName } from "~~/server/utils/fileStorage";
 
 export default defineEventHandler(async (event) => {
     const shareToken = getRouterParam(event, "token");
@@ -9,13 +10,7 @@ export default defineEventHandler(async (event) => {
     }
 
     const db = useDrizzle();
-    const share = await db.select().from(folderPublicShares)
-        .where(eq(folderPublicShares.token, shareToken))
-        .get();
-
-    if (!share?.folderId) {
-        throw createError({ statusCode: 404, statusMessage: "Share not found" });
-    }
+    const share = await getPublicFolderShare(db, shareToken);
 
     const folder = await db.select().from(folders)
         .where(eq(folders.id, Number(share.folderId)))
@@ -29,5 +24,19 @@ export default defineEventHandler(async (event) => {
         .where(eq(uploads.folderId, share.folderId))
         .all();
 
-    return { folder, uploads: folderUploads };
+    return {
+        folder: {
+            id: folder.id,
+            name: folder.name,
+            createdAt: folder.createdAt,
+            iconUrl: publicFolderIconUrl(share.token, folder.iconPath)
+        },
+        uploads: folderUploads.map(upload => ({
+            id: upload.id,
+            folderId: upload.folderId,
+            size: upload.size,
+            createdAt: upload.createdAt,
+            fileName: upload.filePath ? getStoredFileName(upload.filePath) : null
+        }))
+    };
 });

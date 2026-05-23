@@ -2,16 +2,7 @@ import { eq } from "drizzle-orm";
 import { folderUserShares, folders } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
-    const { token } = await readBody(event);
-
-    if (!token) {
-        throw createError({
-            statusCode: 400,
-            statusMessage: "No token provided"
-        });
-    }
-
-    const userPayload = getUserPayload(token);
+    const userPayload = getAuthenticatedUserPayload(event);
 
     const db = useDrizzle();
     const userFolders = await db.select().from(folders)
@@ -22,7 +13,9 @@ export default defineEventHandler(async (event) => {
         id: folders.id,
         userId: folders.userId,
         name: folders.name,
-        createdAt: folders.createdAt
+        iconPath: folders.iconPath,
+        createdAt: folders.createdAt,
+        accessRole: folderUserShares.role
     }).from(folderUserShares)
         .innerJoin(folders, eq(folderUserShares.folderId, folders.id))
         .where(eq(folderUserShares.sharedWithUserId, String(userPayload.id)))
@@ -30,8 +23,8 @@ export default defineEventHandler(async (event) => {
 
     return {
         folders: [
-            ...userFolders.map(folder => ({ ...folder, shared: false })),
-            ...sharedFolders.map(folder => ({ ...folder, shared: true }))
+            ...userFolders.map(folder => folderResponse(folder, false, "owner")),
+            ...sharedFolders.map(folder => folderResponse(folder, true, folder.accessRole ?? "member"))
         ]
     };
 });

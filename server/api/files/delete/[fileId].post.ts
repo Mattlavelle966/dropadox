@@ -1,10 +1,8 @@
-import fs from "fs";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { uploads } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
     const fileId = Number(getRouterParam(event, "fileId"));
-    const { token } = await readBody(event);
 
     if (!Number.isInteger(fileId)) {
         throw createError({
@@ -13,21 +11,12 @@ export default defineEventHandler(async (event) => {
         });
     }
 
-    if (!token) {
-        throw createError({
-            statusCode: 400,
-            statusMessage: "No token provided"
-        });
-    }
-
-    const userPayload = getUserPayload(token);
+    const userPayload = getAuthenticatedUserPayload(event);
+    const userId = String(userPayload.id);
     const db = useDrizzle();
 
     const upload = await db.select().from(uploads)
-        .where(and(
-            eq(uploads.id, fileId),
-            eq(uploads.userId, String(userPayload.id))
-        ))
+        .where(eq(uploads.id, fileId))
         .get();
 
     if (!upload) {
@@ -37,15 +26,19 @@ export default defineEventHandler(async (event) => {
         });
     }
 
-    await db.delete(uploads)
-        .where(and(
-            eq(uploads.id, fileId),
-            eq(uploads.userId, String(userPayload.id))
-        ));
+    const folderAccess = upload.folderId
+        ? await getFolderAccess(db, upload.folderId, userId)
+        : null;
+    const canDelete = upload.userId === userId || folderAccess?.isOwner;
 
-    if (upload.filePath && fs.existsSync(upload.filePath)) {
-        fs.unlinkSync(upload.filePath);
+    if (!canDelete) {
+        throw createError({
+            statusCode: 403,
+            statusMessage: "Not allowed"
+        });
     }
+
+    await removeUploadReference(db, upload);
 
     return { deleted: true, fileId };
 });

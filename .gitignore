@@ -15,6 +15,7 @@ logs
 
 # Database
 public/uploads/*
+uploads/*
 
 # Misc
 .DS_Store

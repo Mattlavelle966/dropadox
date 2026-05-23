@@ -11,6 +11,7 @@
         "login": "Login",
         "signup": "Sign Up",
         "settings": "Settings",
+        "admin": "Admin",
         "logOut": "Log Out"
     },
     "footer": {

@@ -3,6 +3,16 @@
         "text": "Oh, hey!",
         "name": "Name",
         "buttonText": "Create Account",
+        "challenge": {
+            "title": "Timing check",
+            "instructions": "Press Space or hit the button while the line is inside the green zone.",
+            "attempts": "{count} attempts left",
+            "hit": "Hit",
+            "reset": "Reset",
+            "passed": "Passed",
+            "miss": "Missed. Try again.",
+            "failed": "Start a new challenge and try again."
+        },
         "validation": {
             "nameRequired": "Please enter your name."
         },

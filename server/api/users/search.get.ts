@@ -1,34 +1,44 @@
-import { like, ne, and, or } from "drizzle-orm";
-import { users } from "~~/server/database/schema";
+import { like, ne, and, or, sql } from "drizzle-orm";
+import { userSettings, users } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
     const query = getQuery(event);
-    const token = String(query.token ?? "");
     const search = String(query.q ?? "").trim();
 
-    if (!token) {
-        throw createError({ statusCode: 400, statusMessage: "No token provided" });
-    }
-
-    if (search.length < 2) {
+    if (search.length < 2 || search.length > 64 || search.replace(/[%_]/g, "").length < 2) {
         return { users: [] };
     }
 
-    const userPayload = getUserPayload(token);
+    enforceRateLimit(event, "user-search", 120, 60_000);
+    const userPayload = getAuthenticatedUserPayload(event);
     const results = await useDrizzle().select({
         id: users.id,
         name: users.name,
-        email: users.email
+        email: users.email,
+        avatarPath: userSettings.avatarPath
     }).from(users)
+        .leftJoin(userSettings, sql`${userSettings.userID} = cast(${users.id} as text)`)
         .where(and(
             or(
                 like(users.email, `%${search}%`),
                 like(users.name, `%${search}%`)
             ),
-            ne(users.id, Number(userPayload.id))
+            ne(users.id, Number(userPayload.id)),
+            or(
+                sql`${userSettings.searchVisible} is null`,
+                ne(userSettings.searchVisible, "false")
+            )
         ))
         .limit(10)
         .all();
 
-    return { users: results };
+    return {
+        users: results.map((user) => ({
+            id: user.id,
+            name: user.name,
+            username: user.name,
+            email: user.email,
+            avatarUrl: userAvatarUrl(user.id, user.avatarPath)
+        }))
+    };
 });

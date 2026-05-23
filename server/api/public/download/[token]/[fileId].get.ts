@@ -1,6 +1,7 @@
 import fs from "fs";
 import { and, eq } from "drizzle-orm";
-import { folderPublicShares, uploads } from "~~/server/database/schema";
+import { uploads } from "~~/server/database/schema";
+import { setDownloadHeaders } from "~~/server/utils/fileStorage";
 
 export default defineEventHandler(async (event) => {
     const shareToken = getRouterParam(event, "token");
@@ -10,14 +11,9 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 400, statusMessage: "Invalid download link" });
     }
 
+    enforceRateLimit(event, `public-download:${shareToken}`, 120, 60_000);
     const db = useDrizzle();
-    const share = await db.select().from(folderPublicShares)
-        .where(eq(folderPublicShares.token, shareToken))
-        .get();
-
-    if (!share?.folderId) {
-        throw createError({ statusCode: 404, statusMessage: "Share not found" });
-    }
+    const share = await getPublicFolderShare(db, shareToken);
 
     const upload = await db.select().from(uploads)
         .where(and(eq(uploads.id, fileId), eq(uploads.folderId, share.folderId)))
@@ -27,5 +23,6 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 404, statusMessage: "File not found" });
     }
 
+    setDownloadHeaders(event, upload.filePath);
     return sendStream(event, fs.createReadStream(upload.filePath));
 });

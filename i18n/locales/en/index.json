@@ -1,6 +1,11 @@
 {
     "index": {
         "h2": "Fast, Simple File Sharing",
-        "tagLine": "Drop your files, get a link. No hassle."
+        "tagLine": "Drop your files, get a link. No hassle.",
+        "publishedFolders": "Published folders",
+        "sortedByLikes": "Sorted by likes",
+        "openFolder": "Open folder",
+        "noDescription": "No description provided.",
+        "noPublishedFolders": "No folders have been published yet."
     }
 }
