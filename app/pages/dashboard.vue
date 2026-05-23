@@ -81,6 +81,7 @@
             <div v-for="item in tableRows" :key="item.key"
               class="dashboard-table-row grid items-center border-b border-zinc-200 px-3 py-2 text-sm last:border-b-0 hover:bg-zinc-100 dark:border-neutral-800 dark:hover:bg-neutral-900/80"
               :style="tableGridStyle"
+              @contextmenu.prevent="openTableContextMenu(item, $event)"
               @mouseenter="item.kind === 'file' && openFilePreview(item.file, $event)"
               @mousemove="item.kind === 'file' && moveFilePreview($event)"
               @mouseleave="scheduleHidePreview">
@@ -179,6 +180,58 @@
 
         <ClientOnly>
           <Teleport to="body">
+            <div v-if="contextMenu.open && contextMenu.item" :style="contextMenuStyle"
+              class="dashboard-context-menu fixed z-[1100] min-w-52 border border-zinc-300 bg-white py-1 text-sm text-zinc-950 shadow-xl dark:border-neutral-700 dark:bg-neutral-950 dark:text-white"
+              @click.stop @contextmenu.prevent>
+              <template v-if="contextMenu.item.kind === 'folder'">
+                <button class="dashboard-context-menu-item" @click="runContextAction(() => selectFolder(String(contextMenu.item.folder.id)))">
+                  <Folder class="h-4 w-4" />
+                  {{ t('dashboard.openFolder') }}
+                </button>
+                <button v-if="contextMenu.item.folder.canManage" class="dashboard-context-menu-item"
+                  @click="runContextAction(() => openFolderSettings(contextMenu.item.folder))">
+                  <MoreHorizontal class="h-4 w-4" />
+                  {{ t('dashboard.folderSettings') }}
+                </button>
+                <button class="dashboard-context-menu-item" @click="runContextAction(() => cloneFolder(contextMenu.item.folder))">
+                  <FileIcon class="h-4 w-4" />
+                  {{ t('dashboard.cloneFolder') }}
+                </button>
+                <button v-if="contextMenu.item.folder.canManage" class="dashboard-context-menu-item"
+                  @click="runContextAction(() => openMoveDialog('folder', contextMenu.item.folder))">
+                  <FolderInput class="h-4 w-4" />
+                  {{ t('dashboard.move') }}
+                </button>
+                <button v-if="contextMenu.item.folder.canManage" class="dashboard-context-menu-item text-red-600 hover:text-red-600 dark:text-red-400"
+                  @click="runContextAction(() => deleteFolder(contextMenu.item.folder))">
+                  <Trash2 class="h-4 w-4" />
+                  {{ t('dashboard.deleteFolder') }}
+                </button>
+                <button v-if="contextMenu.item.folder.shared" class="dashboard-context-menu-item text-red-600 hover:text-red-600 dark:text-red-400"
+                  @click="runContextAction(() => leaveFolder(contextMenu.item.folder))">
+                  <Trash2 class="h-4 w-4" />
+                  {{ t('dashboard.leaveSharedFolder') }}
+                </button>
+              </template>
+              <template v-else>
+                <button class="dashboard-context-menu-item" @click="runContextAction(() => openFileDetails(contextMenu.item.file))">
+                  <Eye class="h-4 w-4" />
+                  {{ t('dashboard.viewDetails') }}
+                </button>
+                <button class="dashboard-context-menu-item" @click="runContextAction(() => downloadFile(contextMenu.item.file))">
+                  <Download class="h-4 w-4" />
+                  {{ t('dashboard.download') }}
+                </button>
+                <button class="dashboard-context-menu-item" @click="runContextAction(() => openMoveDialog('file', contextMenu.item.file))">
+                  <FolderInput class="h-4 w-4" />
+                  {{ t('dashboard.move') }}
+                </button>
+                <button class="dashboard-context-menu-item text-red-600 hover:text-red-600 dark:text-red-400" @click="runContextAction(() => deleteFile(contextMenu.item.file))">
+                  <Trash2 class="h-4 w-4" />
+                  {{ t('dashboard.delete') }}
+                </button>
+              </template>
+            </div>
             <div v-if="previewFile && canPreviewFile(previewFile.fileName)" :style="previewStyle"
               @mouseenter="cancelHidePreview" @mouseleave="scheduleHidePreview"
               class="fixed z-[1000] overflow-hidden border border-zinc-300 bg-white text-zinc-950 shadow-2xl [color-scheme:light]">
@@ -297,6 +350,17 @@ const moveKind = ref<"file" | "folder" | null>(null);
 const moveItem = ref<any | null>(null);
 const moveTargetFolderId = ref("");
 const moveError = ref("");
+const contextMenu = ref<{
+  open: boolean;
+  item: any | null;
+  x: number;
+  y: number;
+}>({
+  open: false,
+  item: null,
+  x: 0,
+  y: 0
+});
 const tableColumnWidths = ref({
   name: 320,
   type: 112,
@@ -325,6 +389,10 @@ const tableGridStyle = computed(() => ({
   "--size-col": `${tableColumnWidths.value.size}px`,
   "--date-col": `${tableColumnWidths.value.date}px`,
   "--actions-col": `${tableColumnWidths.value.actions}px`
+}));
+const contextMenuStyle = computed(() => ({
+  left: `${contextMenu.value.x}px`,
+  top: `${contextMenu.value.y}px`
 }));
 const selectedFolder = computed(() => {
   if (!selectedFolderId.value) return null;
@@ -671,6 +739,44 @@ function fileDetailsLocation(file: any) {
   };
 }
 
+function openTableContextMenu(item: any, event: MouseEvent) {
+  cancelHidePreview();
+
+  const menuWidth = 224;
+  const menuHeight = item.kind === "folder" ? 260 : 180;
+  const padding = 8;
+  const maxX = Math.max(padding, window.innerWidth - menuWidth - padding);
+  const maxY = Math.max(padding, window.innerHeight - menuHeight - padding);
+
+  contextMenu.value = {
+    open: true,
+    item,
+    x: Math.min(event.clientX, maxX),
+    y: Math.min(event.clientY, maxY)
+  };
+}
+
+function closeTableContextMenu() {
+  contextMenu.value.open = false;
+  contextMenu.value.item = null;
+}
+
+function runContextAction(action: () => unknown) {
+  const result = action();
+  closeTableContextMenu();
+  return result;
+}
+
+function onContextKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape") {
+    closeTableContextMenu();
+  }
+}
+
+function openFileDetails(file: any) {
+  return navigateTo(fileDetailsLocation(file));
+}
+
 function downloadFile(file: any) {
   const a = document.createElement("a");
   a.href = `/api/download/${file.id}`;
@@ -821,11 +927,16 @@ onMounted(() => {
   }, 5000);
 
   window.addEventListener("focus", refreshDashboard);
+  window.addEventListener("click", closeTableContextMenu);
+  window.addEventListener("keydown", onContextKeydown);
+  window.addEventListener("resize", closeTableContextMenu);
+  window.addEventListener("scroll", closeTableContextMenu, true);
   document.addEventListener("visibilitychange", onVisibilityChange);
 });
 
 onBeforeUnmount(() => {
   cancelHidePreview();
+  closeTableContextMenu();
   window.removeEventListener("pointermove", resizeColumn);
   window.removeEventListener("pointerup", stopColumnResize);
   if (dashboardRefreshTimer) {
@@ -833,6 +944,10 @@ onBeforeUnmount(() => {
   }
 
   window.removeEventListener("focus", refreshDashboard);
+  window.removeEventListener("click", closeTableContextMenu);
+  window.removeEventListener("keydown", onContextKeydown);
+  window.removeEventListener("resize", closeTableContextMenu);
+  window.removeEventListener("scroll", closeTableContextMenu, true);
   document.removeEventListener("visibilitychange", onVisibilityChange);
 });
 
@@ -870,6 +985,23 @@ useHead({
   height: 100%;
   margin-inline: auto;
   width: 1px;
+}
+
+.dashboard-context-menu-item {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  width: 100%;
+}
+
+.dashboard-context-menu-item:hover {
+  background: rgb(244 244 245);
+}
+
+:global(.dark) .dashboard-context-menu-item:hover {
+  background: rgb(38 38 38);
 }
 
 @media (max-width: 900px) {
