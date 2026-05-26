@@ -58,7 +58,7 @@
                 :style="{ left: `${markerPosition}%` }"></div>
             </div>
             <div class="mt-2 flex gap-2">
-              <Button class="flex-1 cursor-pointer" type="button" :disabled="challengePassed || attemptsLeft <= 0" @click="hitChallenge">
+              <Button class="flex-1 cursor-pointer" type="button" :disabled="challengePassed || attemptsLeft <= 0 || hitCooldownRemaining > 0 || challengeAttemptPending" @click="hitChallenge">
                 {{ t("signUp.challenge.hit") }}
               </Button>
               <Button class="cursor-pointer" type="button" variant="ghost" @click="startChallenge">
@@ -110,14 +110,19 @@ const targetStart = ref(35);
 const targetEnd = ref(47);
 const markerPosition = ref(0);
 const markerDirection = ref(1);
+const hitCooldownRemaining = ref(0);
+const challengeAttemptPending = ref(false);
 const challengePassed = computed(() => Boolean(challengeToken.value));
 let animationFrame = 0;
 let lastFrame = 0;
+let hitCooldownTimer: ReturnType<typeof window.setInterval> | undefined;
+const hitCooldownMs = 2000;
+const markerSpeed = 0.07;
 
 function animateMarker(timestamp = performance.now()) {
   const delta = lastFrame ? Math.min(timestamp - lastFrame, 50) : 16;
   lastFrame = timestamp;
-  markerPosition.value += markerDirection.value * delta * 0.055;
+  markerPosition.value += markerDirection.value * delta * markerSpeed;
 
   if (markerPosition.value >= 100) {
     markerPosition.value = 100;
@@ -139,6 +144,7 @@ async function startChallenge() {
     cancelAnimationFrame(animationFrame);
   }
 
+  clearHitCooldown();
   challengeError.value = "";
   challengeToken.value = "";
   markerPosition.value = 0;
@@ -160,9 +166,12 @@ async function startChallenge() {
 }
 
 async function hitChallenge() {
-  if (!challengeId.value || challengePassed.value) {
+  if (!challengeId.value || challengePassed.value || hitCooldownRemaining.value > 0 || challengeAttemptPending.value) {
     return;
   }
+
+  challengeAttemptPending.value = true;
+  startHitCooldown();
 
   try {
     const result = await $fetch<{
@@ -191,7 +200,32 @@ async function hitChallenge() {
       : t("signUp.challenge.failed");
   } catch (err: any) {
     challengeError.value = err?.data?.statusMessage || err?.statusMessage || t("signUp.challenge.failed");
+  } finally {
+    challengeAttemptPending.value = false;
   }
+}
+
+function startHitCooldown() {
+  clearHitCooldown();
+  const cooldownEndsAt = Date.now() + hitCooldownMs;
+  hitCooldownRemaining.value = hitCooldownMs;
+
+  hitCooldownTimer = window.setInterval(() => {
+    hitCooldownRemaining.value = Math.max(0, cooldownEndsAt - Date.now());
+
+    if (hitCooldownRemaining.value <= 0) {
+      clearHitCooldown();
+    }
+  }, 100);
+}
+
+function clearHitCooldown() {
+  if (hitCooldownTimer) {
+    window.clearInterval(hitCooldownTimer);
+    hitCooldownTimer = undefined;
+  }
+
+  hitCooldownRemaining.value = 0;
 }
 
 function handleChallengeKeydown(event: KeyboardEvent) {
@@ -256,6 +290,7 @@ onBeforeUnmount(() => {
     cancelAnimationFrame(animationFrame);
   }
 
+  clearHitCooldown();
   window.removeEventListener("keydown", handleChallengeKeydown);
 });
 </script>

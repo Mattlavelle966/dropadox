@@ -23,6 +23,7 @@ export default defineEventHandler(async (event) => {
     const publicShares = await db.select({
         id: folderPublicShares.id,
         token: folderPublicShares.token,
+        passwordHash: folderPublicShares.passwordHash,
         expiresAt: folderPublicShares.expiresAt,
         createdAt: folderPublicShares.createdAt
     }).from(folderPublicShares)
@@ -55,7 +56,11 @@ export default defineEventHandler(async (event) => {
     return {
         folder: folderResponse(folder, false),
         publicShares: publicShares.map((share) => ({
-            ...share,
+            id: share.id,
+            token: share.token,
+            expiresAt: share.expiresAt,
+            createdAt: share.createdAt,
+            hasPassword: Boolean(share.passwordHash),
             url: `/share/folder/${share.token}`
         })),
         publishedShare: publishedShare ? {

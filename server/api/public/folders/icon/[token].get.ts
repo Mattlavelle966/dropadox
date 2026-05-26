@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
     }
 
     const db = useDrizzle();
-    const share = await getPublicFolderShare(db, shareToken);
+    const share = await getPublicFolderShare(db, shareToken, event);
 
     const folder = await db.select().from(folders)
         .where(eq(folders.id, Number(share.folderId)))

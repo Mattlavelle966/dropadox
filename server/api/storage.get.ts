@@ -1,5 +1,5 @@
 import { getUserStorageBytes } from "../database/userStorage";
-import { folderUserShares, folders, uploads } from "../database/schema";
+import { folderUserShares, folders, hiddenSharedStorageFolders, uploads } from "../database/schema";
 import { getMaxUserStorageBytes, getUserStorageMaxBytes } from "../utils/storageQuota";
 import { eq } from "drizzle-orm";
 
@@ -42,6 +42,10 @@ async function getSharedFolderStorage(userId: string) {
     const shares = await db.select().from(folderUserShares)
         .where(eq(folderUserShares.sharedWithUserId, userId))
         .all();
+    const hiddenRows = await db.select().from(hiddenSharedStorageFolders)
+        .where(eq(hiddenSharedStorageFolders.userId, userId))
+        .all();
+    const hiddenFolderIds = new Set(hiddenRows.map((row: any) => String(row.folderId)));
     const foldersByParent = new Map<string | null, any[]>();
     const folderById = new Map<string, any>();
 
@@ -88,6 +92,7 @@ async function getSharedFolderStorage(userId: string) {
                 id: rootFolder.id,
                 name: rootFolder.name,
                 role: share.role ?? "member",
+                hidden: hiddenFolderIds.has(String(rootFolder.id)),
                 usedBytes,
                 maxBytes,
                 usedPercent: maxBytes > 0 ? Math.min(100, Math.round((usedBytes / maxBytes) * 1000) / 10) : 0

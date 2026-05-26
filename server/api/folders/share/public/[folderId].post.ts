@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 import { folderPublicShares } from "~~/server/database/schema";
 
 function createExpiry() {
@@ -17,6 +18,9 @@ export default defineEventHandler(async (event) => {
 
     const userPayload = getAuthenticatedUserPayload(event);
     const userId = String(userPayload.id);
+    const body = await readBody(event).catch(() => ({}));
+    const password = typeof body?.password === "string" ? body.password.trim() : "";
+    const passwordHash = password ? await bcrypt.hash(password, 10) : null;
     const db = useDrizzle();
 
     const folderAccess = await getFolderAccess(db, String(folderId), userId);
@@ -34,11 +38,15 @@ export default defineEventHandler(async (event) => {
             folderId: String(folderId),
             userId: String(folderAccess.folder.userId),
             token: crypto.randomUUID(),
+            passwordHash,
             expiresAt: createExpiry()
         }).returning().get();
-    } else if (!share.expiresAt) {
+    } else if (!share.expiresAt || share.passwordHash !== passwordHash) {
         share = await db.update(folderPublicShares)
-            .set({ expiresAt: createExpiry() })
+            .set({
+                expiresAt: share.expiresAt ? share.expiresAt : createExpiry(),
+                passwordHash
+            })
             .where(eq(folderPublicShares.id, share.id))
             .returning()
             .get();
@@ -46,6 +54,7 @@ export default defineEventHandler(async (event) => {
 
     return {
         token: share.token,
+        hasPassword: Boolean(share.passwordHash),
         url: `/share/folder/${share.token}`
     };
 });

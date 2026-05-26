@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
 
     enforceRateLimit(event, `public-download:${shareToken}`, 120, 60_000);
     const db = useDrizzle();
-    const share = await getPublicFolderShare(db, shareToken);
+    const share = await getPublicFolderShare(db, shareToken, event);
 
     const upload = await db.select().from(uploads)
         .where(and(eq(uploads.id, fileId), eq(uploads.folderId, share.folderId)))

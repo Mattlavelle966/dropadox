@@ -35,6 +35,7 @@ export const folderPublicShares = sqliteTable("folderPublicShares", {
     folderId: text("folder_id").references(() => folders.id),
     userId: text("user_id").references(() => users.id),
     token: text("token").notNull(),
+    passwordHash: text("password_hash"),
     expiresAt: text("expires_at"),
     createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
 })
@@ -55,6 +56,13 @@ export const folderUserShares = sqliteTable("folderUserShares", {
     ownerId: text("owner_id").references(() => users.id),
     sharedWithUserId: text("shared_with_user_id").references(() => users.id),
     role: text("role").default("member"),
+    createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
+})
+
+export const hiddenSharedStorageFolders = sqliteTable("hiddenSharedStorageFolders", {
+    id: int("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id").references(() => users.id),
+    folderId: text("folder_id").references(() => folders.id),
     createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
 })
 
