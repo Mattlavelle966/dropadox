@@ -183,6 +183,20 @@
                             <p class="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
                                 {{ t('dashboard.sharedStorageRole', { role: share.roleLabel }) }}
                             </p>
+                            <Button variant="ghost" class="mt-2 h-8 cursor-pointer justify-start text-red-600 hover:text-red-600"
+                                @click="hideSharedStorage(share.id)">
+                                {{ t('dashboard.hideStorageDrive') }}
+                            </Button>
+                        </div>
+                    </section>
+                    <section v-if="hiddenSharedStorageBoxes.length" class="flex flex-col gap-2">
+                        <h3 class="text-sm font-semibold">{{ t('dashboard.hiddenStorage') }}</h3>
+                        <div v-for="share in hiddenSharedStorageBoxes" :key="share.id"
+                            class="flex items-center justify-between gap-3 border border-zinc-300 p-3 text-sm dark:border-neutral-700">
+                            <span class="min-w-0 truncate font-medium">{{ share.name }}</span>
+                            <Button variant="ghost" class="h-8 cursor-pointer" @click="unhideSharedStorage(share.id)">
+                                {{ t('dashboard.showStorageDrive') }}
+                            </Button>
                         </div>
                     </section>
                 </div>
@@ -248,8 +262,15 @@
 
                     <section class="flex flex-col gap-2">
                         <h3 class="text-sm font-semibold">{{ t('dashboard.publicAccess') }}</h3>
+                        <Input v-model="publicSharePassword" type="password" :placeholder="t('dashboard.publicLinkPasswordPlaceholder')" />
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400">
+                            {{ publicShareHasPassword ? t('dashboard.publicLinkPasswordEnabled') : t('dashboard.publicLinkPasswordOptional') }}
+                        </p>
                         <Button v-if="!publicShareUrl" class="cursor-pointer" @click="createPublicShare">
                             {{ t('dashboard.createPublicLink') }}
+                        </Button>
+                        <Button v-else class="cursor-pointer" variant="ghost" @click="createPublicShare">
+                            {{ t('dashboard.updatePublicLinkPassword') }}
                         </Button>
                         <div v-if="publicShareUrl" class="flex gap-2">
                             <Input :model-value="publicShareUrl" readonly />
@@ -401,6 +422,8 @@ const settingsFolderName = ref("")
 const settingsError = ref("")
 const settingsMessage = ref("")
 const publicShareUrl = ref("")
+const publicSharePassword = ref("")
+const publicShareHasPassword = ref(false)
 const publishedUrl = ref("")
 const publishedMarkdown = ref("")
 const publishedLikes = ref(0)
@@ -414,7 +437,7 @@ const storage = ref<{
     maxBytes: number;
     remainingBytes: number;
     usedPercent: number;
-    sharedFolders: Array<{ id: number; name: string; role?: string; usedBytes: number; maxBytes: number; usedPercent: number }>;
+    sharedFolders: Array<{ id: number; name: string; role?: string; hidden?: boolean; usedBytes: number; maxBytes: number; usedPercent: number }>;
 }>({ usedBytes: 0, maxBytes: 0, remainingBytes: 0, usedPercent: 0, sharedFolders: [] })
 const storageError = ref("")
 
@@ -447,13 +470,15 @@ const storagePercentLabel = computed(() => `${storagePercent.value.toFixed(stora
 const storageUsedLabel = computed(() => formatBytes(storage.value.usedBytes));
 const storageMaxLabel = computed(() => formatBytes(storage.value.maxBytes));
 const storageRemainingLabel = computed(() => formatBytes(storage.value.remainingBytes));
-const sharedStorageBoxes = computed(() => storage.value.sharedFolders.map(folder => ({
+const decoratedSharedStorageFolders = computed(() => storage.value.sharedFolders.map(folder => ({
     ...folder,
     usedLabel: formatBytes(folder.usedBytes),
     maxLabel: formatBytes(folder.maxBytes),
     roleLabel: folder.role === "owner" ? t('dashboard.folderOwner') : t('dashboard.folderMember'),
     percent: Math.min(100, Math.max(0, folder.usedPercent || 0))
 })));
+const sharedStorageBoxes = computed(() => decoratedSharedStorageFolders.value.filter(folder => !folder.hidden));
+const hiddenSharedStorageBoxes = computed(() => decoratedSharedStorageFolders.value.filter(folder => folder.hidden));
 
 // Keep v-model in sync
 watch(search, (val: string) => emit("update:search", val));
@@ -588,6 +613,8 @@ async function openFolderSettings(folder: FolderItem) {
     settingsFolder.value = folder;
     settingsFolderName.value = folder.name;
     publicShareUrl.value = "";
+    publicSharePassword.value = "";
+    publicShareHasPassword.value = false;
     publishedUrl.value = "";
     publishedMarkdown.value = "";
     publishedLikes.value = 0;
@@ -614,7 +641,7 @@ async function loadFolderSettings() {
     try {
         const res = await $fetch<{
             folder: FolderItem;
-            publicShares: Array<{ url: string }>;
+            publicShares: Array<{ url: string; hasPassword?: boolean }>;
             publishedShare: { url: string; markdown: string; likes: number } | null;
             sharedUsers: Array<{ id: number; name: string; email: string; role?: string; avatarUrl?: string | null }>;
         }>(`/api/folders/settings/${settingsFolder.value.id}`);
@@ -622,6 +649,8 @@ async function loadFolderSettings() {
         settingsFolder.value = { ...settingsFolder.value, name: res.folder.name };
         settingsFolderName.value = res.folder.name;
         publicShareUrl.value = firstPublicShareUrl(res.publicShares);
+        publicSharePassword.value = "";
+        publicShareHasPassword.value = Boolean(res.publicShares[0]?.hasPassword);
         publishedUrl.value = res.publishedShare ? `${window.location.origin}${res.publishedShare.url}` : "";
         publishedMarkdown.value = res.publishedShare?.markdown ?? "";
         publishedLikes.value = res.publishedShare?.likes ?? 0;
@@ -754,11 +783,16 @@ async function createPublicShare() {
     settingsMessage.value = "";
 
     try {
-        const res = await $fetch<{ url: string }>(`/api/folders/share/public/${settingsFolder.value.id}`, {
-            method: "POST"
+        const res = await $fetch<{ url: string; hasPassword: boolean }>(`/api/folders/share/public/${settingsFolder.value.id}`, {
+            method: "POST",
+            body: {
+                password: publicSharePassword.value
+            }
         });
 
         publicShareUrl.value = `${window.location.origin}${res.url}`;
+        publicSharePassword.value = "";
+        publicShareHasPassword.value = res.hasPassword;
         settingsMessage.value = t('dashboard.publicLinkCreated');
     } catch (err: any) {
         settingsError.value = err?.data?.statusMessage || err?.statusMessage || "Could not create share link";
@@ -792,9 +826,33 @@ async function removePublicShare() {
         });
 
         publicShareUrl.value = "";
+        publicSharePassword.value = "";
+        publicShareHasPassword.value = false;
         settingsMessage.value = t('dashboard.publicLinkRemoved');
     } catch (err: any) {
         settingsError.value = err?.data?.statusMessage || err?.statusMessage || "Could not remove public link";
+    }
+}
+
+async function hideSharedStorage(folderId: number) {
+    try {
+        await $fetch(`/api/folders/storage/hide/${folderId}`, {
+            method: "POST"
+        });
+        await refreshStorage();
+    } catch (err: any) {
+        storageError.value = err?.data?.statusMessage || err?.statusMessage || "Could not hide storage drive";
+    }
+}
+
+async function unhideSharedStorage(folderId: number) {
+    try {
+        await $fetch(`/api/folders/storage/unhide/${folderId}`, {
+            method: "POST"
+        });
+        await refreshStorage();
+    } catch (err: any) {
+        storageError.value = err?.data?.statusMessage || err?.statusMessage || "Could not show storage drive";
     }
 }
 

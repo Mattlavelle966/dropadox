@@ -5,6 +5,7 @@ type Challenge = {
     targetStart: number;
     targetEnd: number;
     attempts: number;
+    lastAttemptAt: number;
     expiresAt: number;
     passed: boolean;
 }
@@ -13,6 +14,7 @@ const challenges = new Map<string, Challenge>();
 const passedChallengeTokens = new Map<string, number>();
 const maxAttempts = 50;
 const challengeTtlMs = 10 * 60 * 1000;
+const attemptCooldownMs = 2 * 1000;
 
 function pruneChallenges() {
     const now = Date.now();
@@ -40,6 +42,7 @@ export function createSignupChallenge() {
         targetStart,
         targetEnd,
         attempts: 0,
+        lastAttemptAt: 0,
         expiresAt: Date.now() + challengeTtlMs,
         passed: false
     };
@@ -75,6 +78,16 @@ export function attemptSignupChallenge(challengeId: string, position: number) {
         });
     }
 
+    const now = Date.now();
+    const retryAfterMs = attemptCooldownMs - (now - challenge.lastAttemptAt);
+    if (retryAfterMs > 0) {
+        throw createError({
+            statusCode: 429,
+            statusMessage: `Wait ${Math.ceil(retryAfterMs / 1000)} seconds before trying again`
+        });
+    }
+
+    challenge.lastAttemptAt = now;
     challenge.attempts += 1;
 
     const passed = position >= challenge.targetStart && position <= challenge.targetEnd;

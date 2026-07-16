@@ -1,7 +1,11 @@
 import { eq } from "drizzle-orm";
 import { folderPublicShares, folderPublishedShares } from "~~/server/database/schema";
 
-export async function getPublicFolderShare(db: any, token: string) {
+export function publicFolderShareCookieName(token: string) {
+    return `folder_share_${token.replace(/[^a-zA-Z0-9-]/g, "")}`;
+}
+
+export async function getPublicFolderShare(db: any, token: string, event?: any) {
     const publicShare = await db.select().from(folderPublicShares)
         .where(eq(folderPublicShares.token, token))
         .get();
@@ -9,6 +13,10 @@ export async function getPublicFolderShare(db: any, token: string) {
     if (publicShare?.folderId) {
         if (publicShare.expiresAt && new Date(publicShare.expiresAt).getTime() <= Date.now()) {
             throw createError({ statusCode: 410, statusMessage: "Share link expired" });
+        }
+
+        if (publicShare.passwordHash && (!event || getCookie(event, publicFolderShareCookieName(token)) !== publicShare.passwordHash)) {
+            throw createError({ statusCode: 401, statusMessage: "Password required" });
         }
 
         return {

@@ -71,6 +71,20 @@
       "when": 1779541200000,
       "tag": "0009_user_storage_capacity",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1779800000000,
+      "tag": "0010_public_share_passwords_and_hidden_storage",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1779800100000,
+      "tag": "0011_hidden_storage_table_guard",
+      "breakpoints": true
     }
   ]
 }

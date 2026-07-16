@@ -1,6 +1,17 @@
 <template>
   <div class="min-h-dvh bg-zinc-100 p-4 dark:bg-neutral-900">
     <main class="mx-auto flex max-w-3xl flex-col gap-4">
+      <form v-if="passwordRequired" class="mt-16 flex flex-col gap-3 border border-zinc-300 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-950"
+        @submit.prevent="unlockShare">
+        <h1 class="text-xl font-bold text-zinc-900 dark:text-white">Password required</h1>
+        <Input v-model="sharePassword" type="password" placeholder="Folder password" />
+        <Button class="cursor-pointer" type="submit" :disabled="unlocking || !sharePassword">
+          Unlock folder
+        </Button>
+        <p v-if="unlockError" class="text-sm text-red-500">{{ unlockError }}</p>
+      </form>
+
+      <template v-else>
       <header class="border-b border-zinc-300 pb-4 dark:border-neutral-700">
         <div class="flex items-center gap-3">
           <img v-if="folder.iconUrl" :src="folder.iconUrl" :alt="folder.name"
@@ -47,27 +58,77 @@
 
         <p v-if="uploads.length === 0" class="text-zinc-500 dark:text-zinc-400">This folder is empty.</p>
       </div>
+      </template>
     </main>
   </div>
 </template>
 
 <script setup lang="ts">
 import { Download, File, Folder } from "lucide-vue-next";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { isAudioFile, isHtmlPreviewFile, isImageFile, isPdfFile, isVideoFile } from "~~/shared/utils/fileType";
 
 const route = useRoute();
 const token = String(route.params.token);
 
-const data = await $fetch<{
+type PublicFolderData = {
   folder: { id: number; name: string; iconUrl?: string | null };
   uploads: Array<{ id: number; fileName?: string; size?: number }>;
-}>(`/api/public/folders/${token}`);
+};
 
-const folder = data.folder;
-const uploads = data.uploads;
+const folderData = ref<PublicFolderData | null>(null);
+const passwordRequired = ref(false);
+const sharePassword = ref("");
+const unlocking = ref(false);
+const unlockError = ref("");
 const downloadingFileId = ref<number | null>(null);
 const downloadMessage = ref("");
 let downloadMessageTimeout: ReturnType<typeof setTimeout> | null = null;
+
+await loadFolder();
+
+const folder = computed(() => folderData.value?.folder ?? { id: 0, name: "Shared folder", iconUrl: null });
+const uploads = computed(() => folderData.value?.uploads ?? []);
+
+async function loadFolder() {
+  try {
+    folderData.value = await $fetch<PublicFolderData>(`/api/public/folders/${token}`);
+    passwordRequired.value = false;
+    unlockError.value = "";
+  } catch (err: any) {
+    if (err?.statusCode === 401 || err?.data?.statusCode === 401) {
+      passwordRequired.value = true;
+      return;
+    }
+
+    throw err;
+  }
+}
+
+async function unlockShare() {
+  if (!sharePassword.value || unlocking.value) {
+    return;
+  }
+
+  unlocking.value = true;
+  unlockError.value = "";
+
+  try {
+    await $fetch(`/api/public/folders/${token}/unlock`, {
+      method: "POST",
+      body: {
+        password: sharePassword.value
+      }
+    });
+    sharePassword.value = "";
+    await loadFolder();
+  } catch (err: any) {
+    unlockError.value = err?.data?.statusMessage || err?.statusMessage || "Could not unlock folder.";
+  } finally {
+    unlocking.value = false;
+  }
+}
 
 function publicPreviewUrl(upload: { id: number }) {
   return `/api/public/preview/${token}/${upload.id}`;
@@ -114,6 +175,6 @@ onBeforeUnmount(() => {
 });
 
 useHead({
-  title: `Dropadox - ${folder.name}`
+  title: computed(() => `Dropadox - ${folder.value.name}`)
 });
 </script>
