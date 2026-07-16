@@ -11,6 +11,11 @@
                     {{ t("common.nav.dashboard") }}
                 </NuxtLink>
             </div>
+            <div class="flex justify-center items-center dark:text-white/80 hover:dark:text-white/50">
+                <NuxtLink to="/docs">
+                    {{ t("common.nav.docs") }}
+                </NuxtLink>
+            </div>
         </div>
         <div class="flex items-center gap-2">
             <NuxtLink to="/signup" v-if="!isLoggedIn">

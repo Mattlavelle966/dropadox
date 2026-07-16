@@ -6,6 +6,13 @@
         "sortedByLikes": "Sorted by likes",
         "openFolder": "Open folder",
         "noDescription": "No description provided.",
-        "noPublishedFolders": "No folders have been published yet."
+        "noPublishedFolders": "No folders have been published yet.",
+        "apiEyebrow": "Developer API",
+        "apiTitle": "Back up files without opening the dashboard",
+        "apiDescription": "Generate an API key, then automate uploads, folder organization, downloads, and storage checks from your own scripts.",
+        "openDocs": "View docs & API keys",
+        "apiUpload": "Upload from scripts",
+        "apiOrganize": "Create and list folders",
+        "apiRestore": "Download and restore"
     }
 }

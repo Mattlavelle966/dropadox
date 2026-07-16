@@ -20,10 +20,6 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 404, statusMessage: "Share not found" });
     }
 
-    if (share.expiresAt && new Date(share.expiresAt).getTime() <= Date.now()) {
-        throw createError({ statusCode: 410, statusMessage: "Share link expired" });
-    }
-
     const valid = await bcrypt.compare(password, share.passwordHash);
     if (!valid) {
         throw createError({ statusCode: 401, statusMessage: "Incorrect password" });

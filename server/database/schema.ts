@@ -80,3 +80,14 @@ export const ipBlacklist = sqliteTable("ipBlacklist", {
     reason: text("reason").notNull().default("captcha_failed"),
     createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
 })
+
+export const apiKeys = sqliteTable("apiKeys", {
+    id: int("id").primaryKey({ autoIncrement: true }),
+    userId: text("user_id").references(() => users.id).notNull(),
+    name: text("name").notNull(),
+    keyPrefix: text("key_prefix").notNull(),
+    keyHash: text("key_hash").notNull().unique(),
+    lastUsedAt: text("last_used_at"),
+    revokedAt: text("revoked_at"),
+    createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
+})

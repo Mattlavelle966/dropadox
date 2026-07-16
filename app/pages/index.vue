@@ -56,6 +56,40 @@
           {{ t("index.noPublishedFolders") }}
         </p>
       </section>
+
+      <section class="border-t border-zinc-300 py-8 dark:border-neutral-700">
+        <div class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+          <div class="max-w-xl">
+            <div class="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+              <Code2 class="h-5 w-5" />
+              <span class="text-sm font-semibold uppercase tracking-wider">{{ t("index.apiEyebrow") }}</span>
+            </div>
+            <h3 class="mt-2 text-2xl font-bold text-zinc-950 dark:text-white">{{ t("index.apiTitle") }}</h3>
+            <p class="mt-2 text-zinc-600 dark:text-zinc-400">{{ t("index.apiDescription") }}</p>
+          </div>
+          <NuxtLink to="/docs" class="shrink-0">
+            <Button class="w-full cursor-pointer gap-2 md:w-auto">
+              <KeyRound class="h-4 w-4" />
+              {{ t("index.openDocs") }}
+            </Button>
+          </NuxtLink>
+        </div>
+
+        <div class="mt-5 grid gap-3 sm:grid-cols-3">
+          <div class="border border-zinc-300 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-950">
+            <CloudUpload class="h-5 w-5 text-blue-600" />
+            <p class="mt-2 font-semibold text-zinc-900 dark:text-white">{{ t("index.apiUpload") }}</p>
+          </div>
+          <div class="border border-zinc-300 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-950">
+            <FolderSync class="h-5 w-5 text-blue-600" />
+            <p class="mt-2 font-semibold text-zinc-900 dark:text-white">{{ t("index.apiOrganize") }}</p>
+          </div>
+          <div class="border border-zinc-300 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-950">
+            <Download class="h-5 w-5 text-blue-600" />
+            <p class="mt-2 font-semibold text-zinc-900 dark:text-white">{{ t("index.apiRestore") }}</p>
+          </div>
+        </div>
+      </section>
     </main>
 
     <Footer />
@@ -63,7 +97,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { Folder, Heart } from "lucide-vue-next";
+import { CloudUpload, Code2, Download, Folder, FolderSync, Heart, KeyRound } from "lucide-vue-next";
 import { renderSafeMarkdown } from "~~/shared/utils/markdown";
 import Footer from "~/components/Footer.vue";
 

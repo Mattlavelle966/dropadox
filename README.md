@@ -96,6 +96,18 @@ npm run dev
 npx drizzle-kit migrate
 ```
 
+## Automation API
+
+After starting Dropadox, open `/docs` to generate a revocable API key and view the API v1 documentation. The automation API supports storage checks, folder creation and listing, file uploads, file listing, downloads, and deletion.
+
+```bash
+curl -X POST "https://your-dropadox.example/api/v1/files" \
+  -H "Authorization: Bearer $DROPADOX_API_KEY" \
+  -F "file=@./backup.zip"
+```
+
+API keys are stored as SHA-256 hashes and the complete key is only shown once.
+
 ---
 
 ## License

@@ -85,6 +85,13 @@
       "when": 1779800100000,
       "tag": "0011_hidden_storage_table_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1784222884911,
+      "tag": "0012_persistent_shares_and_api_keys",
+      "breakpoints": true
     }
   ]
 }

@@ -1,14 +1,14 @@
-import { uploads } from "../database/schema";
-import { getUserStorageBytes } from "../database/userStorage";
-import { getUserStorageMaxBytes } from "../utils/storageQuota";
-import type { ParsedMultipartUpload } from "../utils/multipartUpload";
+import { uploads } from "~~/server/database/schema";
+import { getUserStorageBytes } from "~~/server/database/userStorage";
+import { getUserStorageMaxBytes } from "~~/server/utils/storageQuota";
+import type { ParsedMultipartUpload } from "~~/server/utils/multipartUpload";
 
 export default defineEventHandler(async (event) => {
     let parsed: ParsedMultipartUpload | undefined;
 
     try {
-        enforceRateLimit(event, "upload", 20, 60_000);
-        const userPayload = getAuthenticatedUserPayload(event);
+        enforceRateLimit(event, "api-v1-file-upload", 60, 60_000);
+        const userPayload = await getApiKeyUserPayload(event);
         const db = useDrizzle();
         const userId = String(userPayload.id);
         const maxBytes = await getUserStorageMaxBytes(db, userId);
@@ -19,11 +19,7 @@ export default defineEventHandler(async (event) => {
             throw createError({
                 statusCode: 413,
                 statusMessage: "MAXIMUM_STORAGE_REACHED",
-                data: {
-                    maxBytes,
-                    usedBytes,
-                    fileBytes: 0
-                }
+                data: { maxBytes, usedBytes, fileBytes: 0 }
             });
         }
 
@@ -34,54 +30,49 @@ export default defineEventHandler(async (event) => {
         );
 
         if (!parsed.uploadPath || !parsed.filename) {
-            throw createError({
-                statusCode: 400,
-                statusMessage: "No file provided"
-            });
+            throw createError({ statusCode: 400, statusMessage: "No file provided" });
         }
 
         const folderId = parsed.folderId ? String(parsed.folderId) : null;
         let folderAccess = null;
 
         if (folderId) {
+            if (!Number.isInteger(Number(folderId))) {
+                throw createError({ statusCode: 400, statusMessage: "Invalid folder id" });
+            }
+
             folderAccess = await getFolderAccess(db, folderId, userId);
 
             if (!folderAccess || (!folderAccess.isOwner && !folderAccess.isSharedWithUser)) {
-                throw createError({
-                    statusCode: 404,
-                    statusMessage: "Folder not found"
-                });
+                throw createError({ statusCode: 404, statusMessage: "Folder not found" });
             }
         }
 
         const storageOwnerId = folderAccess ? String(folderAccess.folder.userId) : userId;
         await assertUploadStorageCapacity(db, storageOwnerId, parsed.size);
 
-        const upload = await db.insert(uploads)
-            .values({
-                userId: storageOwnerId,
-                folderId,
-                filePath: parsed.uploadPath,
-                privacyFlag: "private",
-                size: parsed.size,
-            }).returning().get();
-
-        return {
-            upload: {
-                id: upload.id,
-                userId: upload.userId,
-                folderId: upload.folderId,
-                privacyFlag: upload.privacyFlag,
-                size: upload.size,
-                createdAt: upload.createdAt,
-                fileName: parsed.filename
-            },
-            name: parsed.filename,
-            type: parsed.mimeType,
+        const upload = await db.insert(uploads).values({
+            userId: storageOwnerId,
+            folderId,
+            filePath: parsed.uploadPath,
+            privacyFlag: "private",
             size: parsed.size
+        }).returning().get();
+
+        setResponseStatus(event, 201);
+        return {
+            file: {
+                id: upload.id,
+                folderId: upload.folderId ? Number(upload.folderId) : null,
+                name: parsed.filename,
+                type: parsed.mimeType,
+                size: upload.size ?? 0,
+                createdAt: upload.createdAt,
+                downloadUrl: `/api/v1/files/${upload.id}`
+            }
         };
     } catch (error) {
         removeUploadedFile(parsed?.uploadPath);
         throw error;
     }
-})
+});

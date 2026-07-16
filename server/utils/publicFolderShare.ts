@@ -11,10 +11,6 @@ export async function getPublicFolderShare(db: any, token: string, event?: any) 
         .get();
 
     if (publicShare?.folderId) {
-        if (publicShare.expiresAt && new Date(publicShare.expiresAt).getTime() <= Date.now()) {
-            throw createError({ statusCode: 410, statusMessage: "Share link expired" });
-        }
-
         if (publicShare.passwordHash && (!event || getCookie(event, publicFolderShareCookieName(token)) !== publicShare.passwordHash)) {
             throw createError({ statusCode: 401, statusMessage: "Password required" });
         }

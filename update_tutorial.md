@@ -45,7 +45,7 @@ Load the same environment file the production app uses, then run Drizzle migrati
 set -a
 . ./.env
 set +a
-npx drizzle-kit migrate
+npm run db:migrate
 ```
 
 If the database is outdated, this applies the missing files in `server/database/migrations`.
@@ -110,6 +110,8 @@ For Docker Compose, update the port mapping if needed, then start it again:
 ```bash
 docker compose up -d --build
 ```
+
+The provided Compose command now applies pending migrations before each production build. Migrations are tracked and only run once, so existing users, files, folders, and public-link tokens are preserved.
 
 ## Rollback
 
