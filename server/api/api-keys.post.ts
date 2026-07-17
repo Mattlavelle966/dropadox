@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { apiKeys } from "~~/server/database/schema";
 
 export default defineEventHandler(async (event) => {
@@ -15,8 +16,20 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 400, statusMessage: "API key name is too long" });
     }
 
+    const db = useDrizzle();
+    const activeKeyCount = await db.select({ count: sql<number>`count(*)` }).from(apiKeys)
+        .where(and(
+            eq(apiKeys.userId, String(userPayload.id)),
+            isNull(apiKeys.revokedAt)
+        ))
+        .get();
+
+    if (Number(activeKeyCount?.count ?? 0) >= 25) {
+        throw createError({ statusCode: 409, statusMessage: "Revoke an existing API key before creating another" });
+    }
+
     const rawKey = `ddx_${randomBytes(32).toString("base64url")}`;
-    const key = await useDrizzle().insert(apiKeys).values({
+    const key = await db.insert(apiKeys).values({
         userId: String(userPayload.id),
         name,
         keyPrefix: rawKey.slice(0, 12),

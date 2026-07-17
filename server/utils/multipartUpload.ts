@@ -58,6 +58,9 @@ export async function parseMultipartUpload(
                 headers: event.node.req.headers,
                 limits: {
                     files: 1,
+                    fields: 1,
+                    parts: 2,
+                    fieldSize: 128,
                     fileSize: maxBytes
                 }
             });

@@ -7,6 +7,9 @@ import { getFileExtension } from "~~/shared/utils/fileType";
 import { getStoredFileName } from "~~/server/utils/fileStorage";
 
 const maxTextBytes = 500_000;
+const maxStructuredDocumentBytes = 10_000_000;
+const maxArchiveUncompressedBytes = 40_000_000;
+const maxArchiveEntries = 2_000;
 const maxRows = 80;
 const maxColumns = 16;
 
@@ -71,12 +74,80 @@ async function readTextPreview(filePath: string) {
     }
 }
 
+async function assertSafeStructuredDocument(filePath: string) {
+    const stat = await fs.stat(filePath);
+    if (stat.size > maxStructuredDocumentBytes) {
+        throw createError({ statusCode: 413, statusMessage: "Document is too large to preview" });
+    }
+
+    const archive = await fs.readFile(filePath);
+    let endRecordOffset = -1;
+
+    for (let offset = archive.length - 22; offset >= Math.max(0, archive.length - 65_557); offset -= 1) {
+        if (archive.readUInt32LE(offset) === 0x06054b50) {
+            endRecordOffset = offset;
+            break;
+        }
+    }
+
+    if (endRecordOffset < 0) {
+        throw createError({ statusCode: 415, statusMessage: "Invalid document archive" });
+    }
+
+    const declaredEntries = archive.readUInt16LE(endRecordOffset + 10);
+    const centralDirectorySize = archive.readUInt32LE(endRecordOffset + 12);
+    const centralDirectoryOffset = archive.readUInt32LE(endRecordOffset + 16);
+
+    if (declaredEntries > maxArchiveEntries
+        || centralDirectoryOffset + centralDirectorySize > archive.length) {
+        throw createError({ statusCode: 415, statusMessage: "Invalid document archive" });
+    }
+
+    let entryOffset = centralDirectoryOffset;
+    let parsedEntries = 0;
+    let compressedBytes = 0;
+    let uncompressedBytes = 0;
+
+    while (entryOffset < centralDirectoryOffset + centralDirectorySize) {
+        if (entryOffset + 46 > archive.length || archive.readUInt32LE(entryOffset) !== 0x02014b50) {
+            throw createError({ statusCode: 415, statusMessage: "Invalid document archive" });
+        }
+
+        const compressedSize = archive.readUInt32LE(entryOffset + 20);
+        const uncompressedSize = archive.readUInt32LE(entryOffset + 24);
+        const fileNameLength = archive.readUInt16LE(entryOffset + 28);
+        const extraLength = archive.readUInt16LE(entryOffset + 30);
+        const commentLength = archive.readUInt16LE(entryOffset + 32);
+
+        if (compressedSize === 0xffffffff || uncompressedSize === 0xffffffff) {
+            throw createError({ statusCode: 415, statusMessage: "Unsupported document archive" });
+        }
+
+        compressedBytes += compressedSize;
+        uncompressedBytes += uncompressedSize;
+        parsedEntries += 1;
+
+        if (parsedEntries > maxArchiveEntries
+            || uncompressedBytes > maxArchiveUncompressedBytes
+            || (compressedBytes > 0 && uncompressedBytes / compressedBytes > 100)) {
+            throw createError({ statusCode: 413, statusMessage: "Document is too large to preview" });
+        }
+
+        entryOffset += 46 + fileNameLength + extraLength + commentLength;
+    }
+
+    if (parsedEntries !== declaredEntries || entryOffset !== centralDirectoryOffset + centralDirectorySize) {
+        throw createError({ statusCode: 415, statusMessage: "Invalid document archive" });
+    }
+}
+
 export async function renderDocumentPreview(event: H3Event, filePath: string) {
     const fileName = getStoredFileName(filePath);
     const extension = getFileExtension(fileName);
     let body = "";
 
     if (extension === "docx") {
+        await assertSafeStructuredDocument(filePath);
         const result = await mammoth.convertToHtml({ path: filePath });
         body = sanitizeHtml(result.value, {
             allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "h1", "h2", "table", "thead", "tbody", "tr", "th", "td"]),
@@ -93,8 +164,9 @@ export async function renderDocumentPreview(event: H3Event, filePath: string) {
             }
         });
     } else if (extension === "xlsx") {
-        const rows = await readXlsxFile(filePath);
-        body = tablePreview(rows);
+        await assertSafeStructuredDocument(filePath);
+        const sheets = await readXlsxFile(filePath);
+        body = tablePreview(sheets[0]?.data ?? []);
     } else if (extension === "csv" || extension === "tsv") {
         const text = await readTextPreview(filePath);
         body = tablePreview(parseDelimited(text, extension === "tsv" ? "\t" : ","));

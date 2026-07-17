@@ -1,4 +1,5 @@
 export default defineEventHandler(async (event) => {
+    enforceRateLimit(event, "signup-challenge-attempt", 60, 60_000);
     const { challengeId, position } = await readBody(event);
     const numericPosition = Number(position);
 
@@ -9,11 +10,12 @@ export default defineEventHandler(async (event) => {
         });
     }
 
-    const result = attemptSignupChallenge(String(challengeId), numericPosition);
+    const result = attemptSignupChallenge(
+        String(challengeId),
+        numericPosition,
+        getClientAddress(event)
+    );
 
-    if (!result.passed && result.attemptsLeft <= 0) {
-        await blacklistClientAddress(event, "captcha_failed");
-    }
-
+    setHeader(event, "Cache-Control", "no-store");
     return result;
 });

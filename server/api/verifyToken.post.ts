@@ -1,4 +1,5 @@
 export default defineEventHandler(async (event) => {
+    setHeader(event, "Cache-Control", "no-store");
     let payload;
 
     try {
