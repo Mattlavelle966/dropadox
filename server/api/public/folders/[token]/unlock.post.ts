@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
     setCookie(event, publicFolderShareCookieName(shareToken), share.passwordHash, {
         httpOnly: true,
         sameSite: "lax",
-        secure: process.env.COOKIE_SECURE === "true",
+        secure: process.env.COOKIE_SECURE === "true" || getRequestHeader(event, "x-forwarded-proto") === "https",
         path: `/`,
         maxAge: 60 * 60 * 24 * 30
     });

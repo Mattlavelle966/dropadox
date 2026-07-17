@@ -8,11 +8,14 @@ type Challenge = {
     lastAttemptAt: number;
     expiresAt: number;
     passed: boolean;
+    clientAddress: string;
 }
 
 const challenges = new Map<string, Challenge>();
-const passedChallengeTokens = new Map<string, number>();
+const passedChallengeTokens = new Map<string, { expiresAt: number; clientAddress: string }>();
 const maxAttempts = 50;
+const maxActiveChallenges = 5_000;
+const maxPassedChallengeTokens = 5_000;
 const challengeTtlMs = 10 * 60 * 1000;
 const attemptCooldownMs = 2 * 1000;
 
@@ -25,18 +28,23 @@ function pruneChallenges() {
         }
     }
 
-    for (const [tokenId, expiresAt] of passedChallengeTokens) {
-        if (expiresAt <= now) {
+    for (const [tokenId, token] of passedChallengeTokens) {
+        if (token.expiresAt <= now) {
             passedChallengeTokens.delete(tokenId);
         }
     }
 }
 
-export function createSignupChallenge() {
+export function createSignupChallenge(clientAddress: string) {
     pruneChallenges();
 
+    if (challenges.size >= maxActiveChallenges) {
+        throw createError({ statusCode: 429, statusMessage: "Too many active signup challenges" });
+    }
+
     const challengeId = crypto.randomUUID();
-    const targetStart = Math.floor(20 + Math.random() * 55);
+    const randomValue = (crypto.getRandomValues(new Uint32Array(1))[0] ?? 0) / 2 ** 32;
+    const targetStart = Math.floor(20 + randomValue * 55);
     const targetEnd = targetStart + 12;
     const challenge = {
         targetStart,
@@ -44,7 +52,8 @@ export function createSignupChallenge() {
         attempts: 0,
         lastAttemptAt: 0,
         expiresAt: Date.now() + challengeTtlMs,
-        passed: false
+        passed: false,
+        clientAddress
     };
 
     challenges.set(challengeId, challenge);
@@ -58,12 +67,12 @@ export function createSignupChallenge() {
     };
 }
 
-export function attemptSignupChallenge(challengeId: string, position: number) {
+export function attemptSignupChallenge(challengeId: string, position: number, clientAddress: string) {
     pruneChallenges();
 
     const challenge = challenges.get(challengeId);
 
-    if (!challenge) {
+    if (!challenge || challenge.clientAddress !== clientAddress) {
         throw createError({
             statusCode: 404,
             statusMessage: "Challenge expired"
@@ -101,9 +110,13 @@ export function attemptSignupChallenge(challengeId: string, position: number) {
     challenge.passed = true;
     challenges.delete(challengeId);
 
+    if (passedChallengeTokens.size >= maxPassedChallengeTokens) {
+        throw createError({ statusCode: 429, statusMessage: "Too many completed signup challenges" });
+    }
+
     const tokenId = crypto.randomUUID();
     const expiresAt = Date.now() + challengeTtlMs;
-    passedChallengeTokens.set(tokenId, expiresAt);
+    passedChallengeTokens.set(tokenId, { expiresAt, clientAddress });
 
     const challengeToken = jwt.sign({
         purpose: "signup-challenge",
@@ -118,29 +131,24 @@ export function attemptSignupChallenge(challengeId: string, position: number) {
     };
 }
 
-export function verifySignupChallengeToken(token: string) {
+export function consumeSignupChallengeToken(token: string, clientAddress: string) {
     try {
-        pruneChallenges();
         const payload = jwt.verify(token, process.env.JSON_SECRET_KEY!, {
             algorithms: ["HS256"]
         }) as { purpose?: string; tokenId?: string };
-        return payload.purpose === "signup-challenge"
-            && Boolean(payload.tokenId)
-            && passedChallengeTokens.has(payload.tokenId!);
+
+        if (payload.purpose !== "signup-challenge" || !payload.tokenId) {
+            return false;
+        }
+
+        const passedToken = passedChallengeTokens.get(payload.tokenId);
+        if (!passedToken || passedToken.clientAddress !== clientAddress || passedToken.expiresAt <= Date.now()) {
+            return false;
+        }
+
+        passedChallengeTokens.delete(payload.tokenId);
+        return true;
     } catch {
         return false;
-    }
-}
-
-export function consumeSignupChallengeToken(token: string) {
-    try {
-        const payload = jwt.verify(token, process.env.JSON_SECRET_KEY!, {
-            algorithms: ["HS256"]
-        }) as { tokenId?: string };
-        if (payload.tokenId) {
-            passedChallengeTokens.delete(payload.tokenId);
-        }
-    } catch {
-        // Invalid tokens are handled by verifySignupChallengeToken before this is called.
     }
 }

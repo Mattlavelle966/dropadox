@@ -8,6 +8,22 @@ type Bucket = {
 }
 
 const buckets = new Map<string, Bucket>();
+const maxBuckets = 20_000;
+let lastBucketPruneAt = 0;
+
+function pruneRateLimitBuckets(now: number) {
+    if (now - lastBucketPruneAt < 60_000 && buckets.size < maxBuckets) {
+        return;
+    }
+
+    for (const [key, bucket] of buckets) {
+        if (bucket.resetAt <= now) {
+            buckets.delete(key);
+        }
+    }
+
+    lastBucketPruneAt = now;
+}
 
 export function getClientAddress(event: H3Event) {
     if (process.env.TRUST_PROXY === "true") {
@@ -25,6 +41,15 @@ export function getClientAddress(event: H3Event) {
 export function enforceRateLimit(event: H3Event, key: string, limit: number, windowMs: number) {
     const now = Date.now();
     const bucketKey = `${key}:${getClientAddress(event)}`;
+    pruneRateLimitBuckets(now);
+
+    if (buckets.size >= maxBuckets && !buckets.has(bucketKey)) {
+        throw createError({
+            statusCode: 429,
+            statusMessage: "Too many requests"
+        });
+    }
+
     const bucket = buckets.get(bucketKey);
 
     if (!bucket || bucket.resetAt <= now) {

@@ -69,7 +69,7 @@ export default defineEventHandler(async (event) => {
         })
     }
 
-    if (!challengeToken || !verifySignupChallengeToken(String(challengeToken))) {
+    if (!challengeToken || !consumeSignupChallengeToken(String(challengeToken), getClientAddress(event))) {
         throw createError({
             status: 400,
             statusText: "Complete the signup challenge before creating an account."
@@ -105,11 +105,17 @@ export default defineEventHandler(async (event) => {
             })
         }
 
-        const userCount = await useDrizzle()
+        const adminCount = await useDrizzle()
             .select({ count: sql<number>`count(*)` })
             .from(users)
+            .where(eq(users.role, "admin"))
             .get();
-        const role = Number(userCount?.count ?? 0) === 0 ? "admin" : "user";
+        const initialAdminEmail = String(process.env.INITIAL_ADMIN_EMAIL ?? "").trim().toLowerCase();
+        const role = Number(adminCount?.count ?? 0) === 0
+            && Boolean(initialAdminEmail)
+            && emailAddress === initialAdminEmail
+            ? "admin"
+            : "user";
 
         return await useDrizzle().insert(users).values({
             name: usernameValue,
@@ -119,7 +125,7 @@ export default defineEventHandler(async (event) => {
         }).returning().get();
     });
 
-    consumeSignupChallengeToken(String(challengeToken));
+    setHeader(event, "Cache-Control", "no-store");
 
     await useDrizzle().insert(userSettings).values({
         userID: String(newUser.id),

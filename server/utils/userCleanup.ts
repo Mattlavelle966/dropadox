@@ -1,5 +1,5 @@
 import { eq, or } from "drizzle-orm";
-import { folderUserShares, folders, uploads, userSettings, users } from "~~/server/database/schema";
+import { apiKeys, folderUserShares, folders, uploads, userSettings, users } from "~~/server/database/schema";
 
 export async function deleteUserWithOwnedData(db: any, userId: number | string) {
     const id = Number(userId);
@@ -42,6 +42,7 @@ export async function deleteUserWithOwnedData(db: any, userId: number | string) 
         eq(folderUserShares.ownerId, String(id)),
         eq(folderUserShares.sharedWithUserId, String(id))
     ));
+    await db.delete(apiKeys).where(eq(apiKeys.userId, String(id)));
     await db.delete(userSettings).where(eq(userSettings.userID, String(id)));
     await db.delete(users).where(eq(users.id, id));
 

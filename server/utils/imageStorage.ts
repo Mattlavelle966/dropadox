@@ -41,6 +41,50 @@ function imageContentTypeForPath(filePath: string) {
     return extensionContentTypes[extension] ?? null;
 }
 
+function hasValidImageSignature(filePath: string, mimeType: string) {
+    const descriptor = fs.openSync(filePath, "r");
+
+    try {
+        const header = Buffer.alloc(32);
+        const bytesRead = fs.readSync(descriptor, header, 0, header.length, 0);
+        const bytes = header.subarray(0, bytesRead);
+
+        if (mimeType === "image/jpeg") {
+            return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+        }
+
+        if (mimeType === "image/png") {
+            return bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+        }
+
+        if (mimeType === "image/gif") {
+            const signature = bytes.subarray(0, 6).toString("ascii");
+            return signature === "GIF87a" || signature === "GIF89a";
+        }
+
+        if (mimeType === "image/webp") {
+            return bytes.length >= 12
+                && bytes.subarray(0, 4).toString("ascii") === "RIFF"
+                && bytes.subarray(8, 12).toString("ascii") === "WEBP";
+        }
+
+        if (mimeType === "image/bmp") {
+            return bytes.length >= 2 && bytes.subarray(0, 2).toString("ascii") === "BM";
+        }
+
+        if (mimeType === "image/avif") {
+            const brands = bytes.subarray(8).toString("ascii");
+            return bytes.length >= 16
+                && bytes.subarray(4, 8).toString("ascii") === "ftyp"
+                && (brands.includes("avif") || brands.includes("avis"));
+        }
+
+        return false;
+    } finally {
+        fs.closeSync(descriptor);
+    }
+}
+
 export function parseImageUpload(event: H3Event, scope: string): Promise<StoredImage> {
     return new Promise((resolve, reject) => {
         let upload: StoredImage | null = null;
@@ -61,6 +105,8 @@ export function parseImageUpload(event: H3Event, scope: string): Promise<StoredI
             headers: event.node.req.headers,
             limits: {
                 files: 1,
+                fields: 0,
+                parts: 1,
                 fileSize: maxImageBytes
             }
         });
@@ -98,6 +144,8 @@ export function parseImageUpload(event: H3Event, scope: string): Promise<StoredI
             });
 
             file.on("limit", () => {
+                writeStream.once("close", () => removeStoredImage(upload?.filePath));
+                writeStream.destroy();
                 fail(createError({
                     statusCode: 413,
                     statusMessage: "Image is too large"
@@ -107,7 +155,14 @@ export function parseImageUpload(event: H3Event, scope: string): Promise<StoredI
             file.pipe(writeStream);
             pendingWrites.push(new Promise((writeResolve, writeReject) => {
                 writeStream.on("finish", writeResolve);
-                writeStream.on("error", writeReject);
+                writeStream.on("error", (error) => {
+                    if (rejected) {
+                        writeResolve();
+                        return;
+                    }
+
+                    writeReject(error);
+                });
             }));
         });
 
@@ -123,6 +178,13 @@ export function parseImageUpload(event: H3Event, scope: string): Promise<StoredI
                     throw createError({
                         statusCode: 400,
                         statusMessage: "No image provided"
+                    });
+                }
+
+                if (!hasValidImageSignature(upload.filePath, upload.mimeType)) {
+                    throw createError({
+                        statusCode: 415,
+                        statusMessage: "File contents do not match the selected image type"
                     });
                 }
 

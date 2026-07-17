@@ -92,9 +92,11 @@ npm install
 # Run local dev server
 npm run dev
 
-# If you need to generate the database
-npx drizzle-kit migrate
+# Create or upgrade the database
+npm run db:migrate
 ```
+
+For a new installation, set `INITIAL_ADMIN_EMAIL` in `.env` before registering the administrator account. When serving behind a reverse proxy, `PUBLIC_ORIGIN` can be set to the externally visible origin (for example, `https://cloud.example.com`). Existing administrator roles are preserved during upgrades.
 
 ## Automation API
 

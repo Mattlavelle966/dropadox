@@ -1,6 +1,6 @@
 import { desc, eq } from 'drizzle-orm';
 import { users } from '../database/schema';
-import { User } from '../utils/useDrizzle';
+import type { User } from '../utils/useDrizzle';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -79,6 +79,8 @@ export default defineEventHandler(async (event) => {
         secure: process.env.COOKIE_SECURE === "true" || getRequestHeader(event, "x-forwarded-proto") === "https",
         httpOnly: true
     });
+
+    setHeader(event, "Cache-Control", "no-store");
 
     return { success: true }
 });

@@ -46,9 +46,12 @@ export async function getApiKeyUserPayload(event: H3Event): Promise<UserPayload>
         });
     }
 
-    await db.update(apiKeys)
-        .set({ lastUsedAt: new Date().toISOString() })
-        .where(eq(apiKeys.id, apiKey.id));
+    const lastUsedAt = apiKey.lastUsedAt ? new Date(apiKey.lastUsedAt).getTime() : 0;
+    if (!Number.isFinite(lastUsedAt) || Date.now() - lastUsedAt >= 5 * 60_000) {
+        await db.update(apiKeys)
+            .set({ lastUsedAt: new Date().toISOString() })
+            .where(eq(apiKeys.id, apiKey.id));
+    }
 
     return {
         id: user.id,
